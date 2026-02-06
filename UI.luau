@@ -9841,6 +9841,4 @@ function Compkiller.newNotify()
 	return Compkiller.NOTIFY_CACHE;
 end;
 
-Compkiller.NilFolder.Name = "Nil-Instances";
-
 return Compkiller;
