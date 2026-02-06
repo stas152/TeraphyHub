@@ -1,3 +1,20 @@
+--[[
+    		Compkiller Interface
+
+    Author: 4lpaca
+    License: MIT
+    Github: https://github.com/4lpaca-pin/CompKiller
+    Original: compkiller.net
+
+        Version: 2.6
+    - Improved Performance Mode
+    	Compkiller:OptimizeMode(< boolean >)
+  	- Added Auto Color Logo
+		Compkiller:CustomIconHighlight()
+--]]
+
+--- Export Types ---
+
 export type cloneref = (target: Instance) -> Instance;
 
 export type Window = {
@@ -24,8 +41,7 @@ export type WindowUpdate = {
 	Logo: string,
 	WindowName: string,
 	UserProfile: string
-}
--- End of type. Add a trailing comma if you want to add more fields.
+};
 
 export type ConfigFunctions = {
 	Directory: string,
@@ -46,6 +62,19 @@ export type ConfigFunctions = {
 			}
 		}	
 	},
+};
+
+export type KeybindSettings = {
+	Key : string,
+	On : boolean | number,
+	Off : boolean | number,
+	Mode : number,
+	Name : string,
+}
+
+export type SecurityConfig = {
+	BlurEnabled : boolean,
+	ImageScale: number,
 };
 
 export type Notify = {
@@ -178,10 +207,16 @@ export type Paragraph = {
 	Content: string
 }
 
-pcall(function()
+pcall(function() -- for Luraph
 	local Constant = table.concat({"LP","H_NO"}).."_VI".."RTU".."AL".."IZE";
 	getfenv()[Constant] = getfenv()[Constant] or function(f) return f end; 
 	-- LPH_NO_VIRTUALIZE
+end);
+
+pcall(function() -- for IB1
+	local Constant = "IB".."_NO_VI".."RTU".."AL".."IZE";
+	getfenv()[Constant] = getfenv()[Constant] or function(f) return f end; 
+	-- IB_NO_VIRTUALIZE
 end);
 
 getgenv = getgenv or getfenv;
@@ -194,7 +229,7 @@ if game:GetService('RunService'):IsStudio() then
 
 	local __get_path_c = function(path)
 		return (string.find(path,'/',1,true) and string.split(path,'/')) or (string.find(path,'\\',1,true) and string.split(path,'\\')) or {path};
-	end
+	end;
 
 	local __get_path = function(path)
 		local main = __get_path_c(path);
@@ -316,26 +351,26 @@ local RunService: RunService = cloneref(game:GetService('RunService'));
 local Players: Players = cloneref(game:GetService('Players'));
 local HttpService: HttpService = cloneref(game:GetService('HttpService'));
 local LocalPlayer: Player = Players.LocalPlayer;
-local CoreGui: PlayerGui = (gethui and gethui()) or cloneref(game:FindFirstChild('CoreGui')) or LocalPlayer.PlayerGui;
+local CoreGui: PlayerGui = (gethui and gethui()) or (get_hidden_gui and get_hidden_gui()) or cloneref(game:FindFirstChild('CoreGui')) or cloneref(LocalPlayer.PlayerGui);
 local Mouse: Mouse = LocalPlayer:GetMouse();
-local CurrentCamera: Camera? = workspace.CurrentCamera;
+local CurrentCamera: Camera? = cloneref(workspace.CurrentCamera);
 
 local Compkiller = {
-	Version = '1.9',
+	Version = '2.6',
 	Logo = "rbxassetid://120245531583106",
 	Windows = {},
 	Scale = {
-		Window = UDim2.new(0, 456,0, 499),
+		Window = UDim2.new(0, 485,0, 565),
 		Mobile = UDim2.new(0, 450,0, 375),
 		TabOpen = 185,
 		TabClose = 85,
 	},
+	PerformanceMode = false,
+	WindowsNil = {},
+	NilFolder = Instance.new('Folder'),
 	ArcylicParent = CurrentCamera,
 	ProtectGui = protect_gui or protectgui or (syn and syn.protect_gui) or function(s) return s; end,
 };
-
-
-Compkiller.InstantLoading = true
 
 Compkiller.Colors = {
 	Highlight = Color3.fromRGB(17, 238, 253),
@@ -356,7 +391,6 @@ Compkiller.Elements = {
 	Highlight = {},
 	DropHighlight = {},
 	Risky = {},
-	AutoButtons = {}, 
 	BGDBColor = {},
 	BlockColor = {},
 	StrokeColor = {},
@@ -371,73 +405,6 @@ Compkiller.DragBlacklist = {};
 Compkiller.IaDrag = false;
 Compkiller.LastDrag = tick();
 Compkiller.Flags = {};
-
--- Runtime keybind support for toggles
-Compkiller._IsCapturingKey = false
-Compkiller._ToggleKeyMap = {}
-Compkiller._ToggleKeyForArgs = {}
-
-function Compkiller:_BindToggleKey(args, keyName)
-	if typeof(keyName) ~= "string" then
-		keyName = (keyName and keyName.Name) or nil
-	end
-	if not keyName or keyName == "NIL" then
-		self:_UnbindToggleKey(args)
-		return
-	end
-	local prev = self._ToggleKeyForArgs[args]
-	if prev and self._ToggleKeyMap[prev] then
-		self._ToggleKeyMap[prev][args] = nil
-	end
-	self._ToggleKeyForArgs[args] = keyName
-	self._ToggleKeyMap[keyName] = self._ToggleKeyMap[keyName] or {}
-	self._ToggleKeyMap[keyName][args] = true
-end
-
-function Compkiller:_UnbindToggleKey(args)
-	local prev = self._ToggleKeyForArgs[args]
-	if prev and self._ToggleKeyMap[prev] then
-		self._ToggleKeyMap[prev][args] = nil
-	end
-	self._ToggleKeyForArgs[args] = nil
-end
-
--- Programmatic API to enable/disable toggles at runtime
-function Compkiller:ToggleFlag(flag, value)
-	local el = self.Flags and self.Flags[flag]
-	if el and el.SetValue and el.GetValue then
-		if value == nil then
-			el:SetValue(not el:GetValue())
-		else
-			el:SetValue(value and true or false)
-		end
-		return el:GetValue()
-	end
-end
-
-function Compkiller:BindToggleKey(flag, keyName)
-	local el = self.Flags and self.Flags[flag]
-	if el then
-		self:_BindToggleKey(el, keyName)
-	end
-end
-
-if not Compkiller._ToggleKeyInputConn then
-	Compkiller._ToggleKeyInputConn = UserInputService.InputBegan:Connect(function(input, gp)
-		if gp then return end
-		if Compkiller._IsCapturingKey then return end
-		if not input.KeyCode or input.KeyCode == Enum.KeyCode.Unknown then return end
-		local keyName = input.KeyCode.Name
-		local map = Compkiller._ToggleKeyMap[keyName]
-		if map then
-			for args,_ in next, map do
-				if type(args.GetValue) == "function" and type(args.SetValue) == "function" then
-					args:SetValue(not args:GetValue())
-				end
-			end
-		end
-	end)
-end
 
 Compkiller.Lucide = {
 	['lucide-mouse-2'] = "rbxassetid://10088146939",
@@ -1452,11 +1419,74 @@ Compkiller.FontAwesome = {
 	['magnifying-glass'] = "rbxassetid://74387839235930",
 };
 
+function Compkiller:OptimizeMode(v)
+	Compkiller.PerformanceMode = v;
+end;
+
+function Compkiller:IsStudio()
+	return RunService:IsStudio()	
+end;
+
+function Compkiller:CustomIconHighlight()
+	Compkiller.CustomHighlightMode = true;
+end;
+
+function Compkiller:_SetNilP(Ins: Instance , Parent: Instance)
+	Compkiller.WindowsNil = Compkiller.WindowsNil or {};
+	Compkiller.NilFolder = Compkiller.NilFolder or Instance.new('Folder');
+
+	if not Compkiller.WindowsNil[Ins] then
+		local win = Compkiller:_GetWindowFromElement(Ins);
+
+		Compkiller.WindowsNil[Ins] = win;
+	end;
+
+	Ins.Parent = Parent or Compkiller.NilFolder;
+end;
+
+function Compkiller:SetAllText(flags : {[string] : string})
+	if not flags then -- reset to default
+		for i,v in next , Compkiller.Flags do
+			if v.SetText then
+				v:SetText(nil);
+			end;
+		end;
+
+		return;
+	end;
+
+	flags = flags or {};
+
+	for i,v in next , flags do
+		if Compkiller.Flags[i] and Compkiller.Flags[i].SetText then
+			Compkiller.Flags[i]:SetText(v);
+		end;
+	end;
+end;
+
 function Compkiller:_GetIcon(name : string , font_aws) : string
+	if Compkiller.SecureMode then
+		local AssetId;
+
+		if font_aws then
+			AssetId = Compkiller.FontAwesome[name] or name;
+		else
+			AssetId = Compkiller.Lucide['lucide-'..tostring(name)] or Compkiller.Lucide[name] or Compkiller.Lucide[tostring(name)] or Compkiller.FontAwesome[name] or name;
+		end;
+
+		if AssetId and AssetId ~= nil then
+			local asset = Compkiller:CacheImage(AssetId);
+
+			return asset;	
+		end;	
+
+		return "";
+	end;
+
 	if font_aws then
 		return Compkiller.FontAwesome[name] or name;
 	end;
-	
+
 	return Compkiller.Lucide['lucide-'..tostring(name)] or Compkiller.Lucide[name] or Compkiller.Lucide[tostring(name)] or Compkiller.FontAwesome[name] or name;
 end;
 
@@ -1517,6 +1547,10 @@ function Compkiller:GetCalculatePosition(planePos: number, planeNormal: number, 
 end;
 
 function Compkiller:_Blur(element : Frame , WindowRemote) : RBXScriptSignal
+	if Compkiller.SecureMode and not Compkiller.SecurityConfig.BlurEnabled then
+		return game.Changed:Connect(function() end);
+	end;
+
 	local Part = Instance.new('Part',Compkiller.ArcylicParent);
 	local DepthOfField = Instance.new('DepthOfFieldEffect',cloneref(game:GetService('Lighting')));
 	local BlockMesh = Instance.new("BlockMesh");
@@ -1524,9 +1558,9 @@ function Compkiller:_Blur(element : Frame , WindowRemote) : RBXScriptSignal
 
 	BlockMesh.Parent = Part;
 
-	Part.Material = Enum.Material.SmoothPlastic;
+	Part.Material = Enum.Material.Glass;
 	Part.Transparency = 1;
-	Part.Reflectance = 0;
+	Part.Reflectance = 1;
 	Part.CastShadow = false;
 	Part.Anchored = true;
 	Part.CanCollide = false;
@@ -1544,7 +1578,33 @@ function Compkiller:_Blur(element : Frame , WindowRemote) : RBXScriptSignal
 
 	Part.Name = Compkiller:_RandomString();
 
+	local disconnect;
+
 	local UpdateFunction = function()
+		if Compkiller.SecureMode then
+			if Part then
+				Part:Destroy();
+				Part = nil;
+			end;
+
+			if DepthOfField then
+				DepthOfField:Destroy();
+				DepthOfField = nil;
+			end;
+
+			if BlockMesh then
+				BlockMesh:Destroy();
+				BlockMesh = nil;
+			end;
+
+			if disconnect then
+				disconnect();
+				disconnect = nil;
+			end;
+
+			return;
+		end;
+
 		local IsWindowActive = WindowRemote:GetValue();
 
 		if IsWindowActive then
@@ -1609,13 +1669,15 @@ function Compkiller:_Blur(element : Frame , WindowRemote) : RBXScriptSignal
 		end;
 	end);
 
-	element.Destroying:Connect(function()
+	disconnect = function()
 		rbxsignal:Disconnect();
 		loopThread:Disconnect();
 		task.cancel(THREAD);
 		Part:Destroy();
 		DepthOfField:Destroy();
-	end);
+	end;
+
+	element.Destroying:Connect(disconnect);
 
 	return rbxsignal;
 end;
@@ -1656,23 +1718,19 @@ function Compkiller:_AddDragBlacklist(Frame: Frame)
 end;
 
 function Compkiller:_GetWindowFromElement(Element)
+	if Compkiller.WindowsNil[Element] then
+		return Compkiller.WindowsNil[Element];
+	end;
+
 	for i,v : ScreenGui in next , Compkiller.Windows do
 		if v and Element:IsDescendantOf(v) then
 			return v;
 		end;
 	end;
-end;
 
-function Compkiller:_RegisterOverlay(Window , Closer)
-	Compkiller.Overlays = Compkiller.Overlays or {}
-	Compkiller.Overlays[Window] = Compkiller.Overlays[Window] or {}
-	table.insert(Compkiller.Overlays[Window], Closer)
-end;
-
-function Compkiller:_CloseOverlays(Window)
-	if Compkiller.Overlays and Compkiller.Overlays[Window] then
-		for i, fn in next , Compkiller.Overlays[Window] do
-			local ok = pcall(fn)
+	for Frame,Window in next , Compkiller.WindowsNil do
+		if Element:IsDescendantOf(Frame) or Frame == Element then
+			return Window;
 		end;
 	end;
 end;
@@ -1739,7 +1797,7 @@ function Compkiller:Drag(InputFrame: Frame, MoveFrame: Frame, Speed : number)
 	local startPos: UDim2 = nil;
 	local Tween = TweenInfo.new(Speed);
 
-	local function updateInput(input)
+	local updateInput = function(input)
 		local delta = input.Position - dragStart;
 		local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 			startPos.Y.Scale, startPos.Y.Offset + delta.Y);
@@ -2160,7 +2218,7 @@ function Compkiller:_AddLinkValue(Name , Default , GlobalBlock , LinkValues , re
 		InfoButton.LayoutOrder = -#LinkValues:GetChildren();
 		InfoButton.Size = UDim2.new(0, 15, 0, 15)
 		InfoButton.ZIndex = GlobalBlock.ZIndex + 25
-		InfoButton.Image = "rbxassetid://10723415903"
+		InfoButton.Image = Compkiller:CacheImage("rbxassetid://10723415903")
 		InfoButton.ImageTransparency = 0.500
 
 		UICorner.CornerRadius = UDim.new(1, 0)
@@ -2247,7 +2305,7 @@ function Compkiller:_AddLinkValue(Name , Default , GlobalBlock , LinkValues , re
 		OptionButton.BorderSizePixel = 0
 		OptionButton.Size = UDim2.new(0, 15, 0, 15)
 		OptionButton.ZIndex = GlobalBlock.ZIndex + 2
-		OptionButton.Image = "rbxassetid://14007344336"
+		OptionButton.Image = Compkiller:CacheImage("rbxassetid://14007344336")
 		OptionButton.ImageTransparency = 0.500
 		OptionButton.LayoutOrder = -#LinkValues:GetChildren();
 
@@ -2366,6 +2424,10 @@ function Compkiller:_CreateBlock(Signal)
 		BlockText.Text = Text;
 	end;
 
+	function rep:GetText()
+		return BlockText.Text;
+	end;
+
 	function rep:SetTextColor(Color)
 		local oldIndex = table.find(Compkiller.Elements.SwitchColor , BlockText);
 
@@ -2382,6 +2444,12 @@ function Compkiller:_CreateBlock(Signal)
 
 	function rep:SetLine(visible)
 		BlockLine.Visible = visible;
+
+		if not visible then
+			BlockLine.Parent = nil;
+		else
+			BlockLine.Parent = rep.Root;
+		end;
 	end;
 
 	function rep:SetTransparency(num)
@@ -2430,16 +2498,131 @@ function Compkiller:_CreateBlock(Signal)
 	return rep;
 end;
 
-function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color: Color3) -> any?)
-  local Window = Compkiller:_GetWindowFromElement(Button);
-  local BaseZ_Index = math.random(1,15) * 100;
+Compkiller.Hash = function(str: string)
+	if typeof(str) ~= "string" then
+		return "ck-unknow";
+	end;
 
-  local InputBlocker = Instance.new("TextButton")
-  local ColorPickerWindow = Instance.new("Frame")
-  local UIStroke = Instance.new("UIStroke")
-  local UICorner = Instance.new("UICorner")
-  local ColorPickBox = Instance.new("ImageLabel")
-  local MouseMovement = Instance.new("ImageLabel")
+	local hex = #str;
+
+	string.gsub(str,'.',function(byte)
+		hex += byte:byte() + #str;
+	end);
+
+	local dh = string.match(str,'%d+');
+
+	return "ck-"..tostring(math.round(hex + 15))..tostring(dh);
+end;
+
+function Compkiller:CacheImage(id: string) : string
+	if not Compkiller.SecureMode or not id or not id:byte() then
+		return id or "";
+	end;
+
+	assert(Compkiller.SecureMode , "please use Compkiller:Security(< string >) before cache image")
+	assert(Compkiller.CacheDirectory , "please use Compkiller:Security(< string >) before cache image")
+
+	local ids = string.match(id , "%d+");
+
+	if ids == nil then
+		return id;
+	end;
+
+	local Hash = Compkiller.Hash(id);
+
+	local cache_path = string.format("%s/cache-%s.png" ,Compkiller.CacheDirectory , Hash);
+
+	if isfile(cache_path) then
+		return (getcustomasset or getsynasset or function() return ''; end)(cache_path);
+	end;
+
+	local imgSize = Compkiller.SecurityConfig.ImageScale;
+
+	local imagesize = (imgSize and string.format("%sx%s", tostring(math.round(imgSize)), tostring(math.round(imgSize)))) or "150x150"
+
+	if imagesize == nil then
+		return ''
+	end;
+
+	local endpoint = string.format(
+		"https://thumbnails.roblox.com/v1/assets?assetIds=%s&size=%s&format=Png&isCircular=false",
+		ids,
+		imagesize
+	);
+
+	local json = game:HttpGet(endpoint);
+
+	local JSON_Decode = select(2, pcall(function()
+		return HttpService:JSONDecode(json);
+	end));
+
+	if typeof(JSON_Decode) == "table" and JSON_Decode and JSON_Decode.data and JSON_Decode.data[1] and JSON_Decode.data[1].imageUrl and JSON_Decode.data[1].state == "Completed" then task.wait()
+		local en = JSON_Decode.data[1].imageUrl;
+
+		writefile(cache_path , game:HttpGet(en));
+
+		task.wait();
+
+		return (getcustomasset or getsynasset or function() return ''; end)(cache_path);
+	end;
+
+	return "";
+end;
+
+function Compkiller:PreloadIcons()
+	local RequiredAssets = {
+		"http://www.roblox.com/asset/?id=112554223509763",
+		"rbxassetid://4805639000",
+		"rbxassetid://6198493000",
+		"rbxassetid://10709790948",
+		"rbxassetid://18518299306",
+		"rbxassetid://10747362393",
+		"rbxassetid://18720640102",
+		"rbxassetid://10723344270",
+		"rbxassetid://109535175596957",
+		"rbxassetid://10747384394",
+		"rbxassetid://10734941499",
+		Compkiller.Logo,
+	};
+
+	if Compkiller.SecureMode then
+		for i,v in next , RequiredAssets do task.wait()
+			pcall(function()
+				Compkiller:CacheImage(v);
+			end);
+		end;
+	else
+		local ContentProvider: ContentProvider = cloneref(game:GetService('ContentProvider'));
+
+		for i,v in next , RequiredAssets do
+			ContentProvider:Preload(v);
+		end;
+	end;
+end;
+
+function Compkiller:Security(directory: string,Config: SecurityConfig) -- Security Mode
+	directory = directory or "Compkiller-Cache";
+
+	if not isfolder(directory) then
+		makefolder(directory);
+	end;
+
+	Compkiller.SecureMode = true;
+
+	Compkiller.SecurityConfig = Config or {};
+
+	Compkiller.CacheDirectory = directory;
+end;
+
+function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color: Color3) -> any?)
+	local Window = Compkiller:_GetWindowFromElement(Button);
+	local BaseZ_Index = math.random(1,15) * 100;
+
+	local ColorPickerWindow = Instance.new("Frame")
+	local UIStroke = Instance.new("UIStroke")
+	local UICorner = Instance.new("UICorner")
+	local ColorPickBox = Instance.new("ImageLabel")
+	local MouseMovement = Instance.new("ImageLabel")
 	local UICorner_2 = Instance.new("UICorner")
 	local UIStroke_2 = Instance.new("UIStroke")
 	local ColorRedGreenBlue = Instance.new("Frame")
@@ -2466,22 +2649,6 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 	local UIStroke_8 = Instance.new("UIStroke")
 	local TextLabel = Instance.new("TextLabel")
 
-	InputBlocker.Name = "ColorPickerModal"
-	InputBlocker.Parent = Window
-	InputBlocker.BackgroundTransparency = 1.000
-	InputBlocker.BorderSizePixel = 0
-	InputBlocker.Position = UDim2.new(0, 0, 0, 0)
-	InputBlocker.Size = UDim2.new(1, 0, 1, 0)
-	InputBlocker.ZIndex = BaseZ_Index - 1
-	InputBlocker.Visible = false
-	InputBlocker.Active = true
-	InputBlocker.AutoButtonColor = false
-	InputBlocker.Text = ""
-	InputBlocker.Modal = true
-	InputBlocker.Selectable = false
-
-	-- Input handler is connected after ToggleUI is defined to avoid premature closure.
-
 	ColorPickerWindow.Name = Compkiller:_RandomString()
 	ColorPickerWindow.Parent = Window
 	ColorPickerWindow.BackgroundColor3 = Compkiller.Colors.BlockBackground
@@ -2502,10 +2669,12 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 
 	UIStroke.Color = Compkiller.Colors.HighStrokeColor
 	UIStroke.Parent = ColorPickerWindow
+
 	table.insert(Compkiller.Elements.HighStrokeColor , {
 		Element = UIStroke,
 		Property = "Color"
 	})
+
 	UICorner.CornerRadius = UDim.new(0, 6)
 	UICorner.Parent = ColorPickerWindow
 
@@ -2517,7 +2686,7 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 	ColorPickBox.Position = UDim2.new(0, 7, 0, 7)
 	ColorPickBox.Size = UDim2.new(0, 145, 0, 145)
 	ColorPickBox.ZIndex = BaseZ_Index + 1
-	ColorPickBox.Image = "http://www.roblox.com/asset/?id=112554223509763"
+	ColorPickBox.Image = Compkiller:CacheImage("http://www.roblox.com/asset/?id=112554223509763");
 
 	MouseMovement.Name = Compkiller:_RandomString()
 	MouseMovement.Parent = ColorPickBox
@@ -2529,7 +2698,7 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 	MouseMovement.Size = UDim2.new(0, 12, 0, 12)
 	MouseMovement.ZIndex = BaseZ_Index + 5
 	MouseMovement.AnchorPoint = Vector2.new(0.5,0.5)
-	MouseMovement.Image = "rbxassetid://4805639000"
+	MouseMovement.Image = Compkiller:CacheImage("rbxassetid://4805639000")
 
 	UICorner_2.CornerRadius = UDim.new(0, 2)
 	UICorner_2.Parent = ColorPickBox
@@ -2640,14 +2809,14 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 	UIStroke_7.Color = Color3.fromRGB(29, 29, 29)
 	UIStroke_7.Parent = ColorOpc
 
-	TransparentImage.Name = "TransparentImage"
+	TransparentImage.Name = Compkiller:_RandomString()
 	TransparentImage.Parent = ColorOpc
 	TransparentImage.BackgroundTransparency = 1.000
 	TransparentImage.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	TransparentImage.BorderSizePixel = 0
 	TransparentImage.Size = UDim2.new(1, 0, 1, 0)
 	TransparentImage.ZIndex = BaseZ_Index + 5
-	TransparentImage.Image = "rbxassetid://6198493000"
+	TransparentImage.Image = Compkiller:CacheImage("rbxassetid://6198493000")
 	TransparentImage.ImageColor3 = Color3.fromRGB(206, 206, 206)
 	TransparentImage.ScaleType = Enum.ScaleType.Crop
 
@@ -2709,6 +2878,16 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 
 	Compkiller:_AddPropertyEvent(ColorPickerWindow,function(v)
 		ColorPickerWindow.Visible = v;
+
+		if Compkiller.PerformanceMode then
+			if ColorPickerWindow.Visible then
+				Compkiller:_SetNilP(ColorPickerWindow , Window);
+			else
+				Compkiller:_SetNilP(ColorPickerWindow , nil);
+			end;
+		else
+			Compkiller:_SetNilP(ColorPickerWindow , Window);
+		end;
 	end)
 
 	local ToggleUI = function(bool)
@@ -2731,9 +2910,6 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 		end;
 
 		if bool then
-
-			-- Show input blocker while the color picker is open
-			InputBlocker.Visible = true
 
 			if not IsSame then
 				ColorPickerWindow.Position = DropPosition
@@ -2825,8 +3001,6 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 				TextTransparency = 0
 			});
 		else
-			-- Hide input blocker when closing
-			InputBlocker.Visible = false
 			Compkiller:_Animation(UIStroke_8,Tween,{
 				Transparency = 1
 			});
@@ -2913,15 +3087,6 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 			});
 		end;
 	end;
-
-	-- Close only when clicking/touching outside the picker; keep it open when interacting with it
-	InputBlocker.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			if not Compkiller:_IsMouseOverFrame(ColorPickerWindow) then
-				ToggleUI(false);
-			end
-		end
-	end)
 
 	Button.MouseButton1Click:Connect(function()
 		ToggleUI(true);
@@ -3062,15 +3227,675 @@ function Compkiller:_AddColorPickerPanel(Button: ImageButton , Callback: (Color:
 		end
 	end)
 
-	function Args:Close()
-		ToggleUI(false);
+	return Args;
+end;
+
+function Compkiller:_DrawKeybinds(Window: ScreenGui)
+	if Compkiller.__KEYBINDS_CACHE then
+		return Compkiller.__KEYBINDS_CACHE;
 	end;
 
-	Compkiller:_RegisterOverlay(Window , function()
-		ToggleUI(false);
+	local Keybinds = Instance.new("Frame")
+	local UICorner = Instance.new("UICorner")
+	local IconFrame = Instance.new("Frame")
+	local UICorner_2 = Instance.new("UICorner")
+	local Frame = Instance.new("Frame")
+	local Icon = Instance.new("ImageLabel")
+	local HeaderFrame = Instance.new("Frame")
+	local HeadLabel = Instance.new("TextLabel")
+	local MainFrame = Instance.new("Frame")
+	local UIListLayout = Instance.new("UIListLayout")
+	local MovingFrame = Instance.new("Frame")
+
+	Keybinds.Name = Compkiller:_RandomString()
+	Keybinds.Parent = Window
+	Keybinds.BackgroundColor3 = Compkiller.Colors.BGDBColor;
+	Keybinds.BackgroundTransparency = 0.025
+	Keybinds.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Keybinds.BorderSizePixel = 0
+	Keybinds.Position = UDim2.new(0,100,0,100)
+	Keybinds.Size = UDim2.new(0, 125, 0, 25)
+	Keybinds.ZIndex = 150
+
+	table.insert(Compkiller.Elements.BGDBColor,{
+		Element = Keybinds,
+		Property = 'BackgroundColor3'
+	});
+
+
+	UICorner.CornerRadius = UDim.new(0, 3)
+	UICorner.Parent = Keybinds
+
+	IconFrame.Name = Compkiller:_RandomString()
+	IconFrame.Parent = Keybinds
+	IconFrame.AnchorPoint = Vector2.new(1, 0.5)
+	IconFrame.BackgroundColor3 = Compkiller.Colors.BGDBColor
+	IconFrame.BackgroundTransparency = 0.300
+	IconFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	IconFrame.BorderSizePixel = 0
+	IconFrame.Position = UDim2.new(0, 5, 0.5, 0)
+	IconFrame.Size = UDim2.new(1, 10, 1, 0)
+	IconFrame.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	IconFrame.ZIndex = 149
+
+	table.insert(Compkiller.Elements.BGDBColor,{
+		Element = IconFrame,
+		Property = 'BackgroundColor3'
+	});
+
+	UICorner_2.CornerRadius = UDim.new(0, 3)
+	UICorner_2.Parent = IconFrame
+
+	Frame.Parent = IconFrame
+	Frame.AnchorPoint = Vector2.new(0, 0.5)
+	Frame.BackgroundColor3 = Compkiller.Colors.Highlight;
+	Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Frame.BorderSizePixel = 0
+	Frame.Position = UDim2.new(1, -5, 0.5, 0)
+	Frame.Size = UDim2.new(0, 2, 1, 0)
+	Frame.ZIndex = 151
+
+	table.insert(Compkiller.Elements.Highlight,{
+		Element = Frame,
+		Property = 'BackgroundColor3'
+	});
+
+	Icon.Name = Compkiller:_RandomString()
+	Icon.Parent = IconFrame
+	Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	Icon.BackgroundTransparency = 1.000
+	Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Icon.BorderSizePixel = 0
+	Icon.Position = UDim2.new(0.5, -2, 0.5, 0)
+	Icon.Size = UDim2.new(0, 20, 0, 20)
+	Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	Icon.ZIndex = 159
+	Icon.Image = Compkiller:CacheImage("rbxassetid://10723416765");
+
+	HeaderFrame.Name = Compkiller:_RandomString()
+	HeaderFrame.Parent = Keybinds
+	HeaderFrame.AnchorPoint = Vector2.new(0.5, 0)
+	HeaderFrame.BackgroundTransparency = 1.000
+	HeaderFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	HeaderFrame.BorderSizePixel = 0
+	HeaderFrame.ClipsDescendants = true
+	HeaderFrame.Position = UDim2.new(0.5, 0, 0, 0)
+	HeaderFrame.Size = UDim2.new(1, -10, 1, 0)
+	HeaderFrame.ZIndex = 155
+
+	HeadLabel.Name = Compkiller:_RandomString()
+	HeadLabel.Parent = HeaderFrame
+	HeadLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	HeadLabel.BackgroundTransparency = 1.000
+	HeadLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	HeadLabel.BorderSizePixel = 0
+	HeadLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+	HeadLabel.Size = UDim2.new(1, -10, 1, 0)
+	HeadLabel.ZIndex = 156
+	HeadLabel.Font = Enum.Font.GothamMedium
+	HeadLabel.Text = "Keybinds"
+	HeadLabel.TextColor3 = Compkiller.Colors.SwitchColor
+	HeadLabel.TextSize = 12.000
+
+	table.insert(Compkiller.Elements.SwitchColor,{
+		Element = HeadLabel,
+		Property = 'TextColor3'
+	});
+
+	MainFrame.Name = Compkiller:_RandomString()
+	MainFrame.Parent = Keybinds
+	MainFrame.AnchorPoint = Vector2.new(1, 0)
+	MainFrame.BackgroundTransparency = 1.000
+	MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	MainFrame.BorderSizePixel = 0
+	MainFrame.Position = UDim2.new(1, 0, 1, 5)
+	MainFrame.Size = UDim2.new(1, 30, 1, 3)
+	MainFrame.ZIndex = 156;
+	MainFrame.ClipsDescendants = true;
+
+	UIListLayout.Parent = MainFrame
+	UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout.Padding = UDim.new(0, 5)
+
+	MovingFrame.Name = Compkiller:_RandomString()
+	MovingFrame.Parent = Keybinds
+	MovingFrame.AnchorPoint = Vector2.new(1, 0.5)
+	MovingFrame.BackgroundTransparency = 1.000
+	MovingFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	MovingFrame.BorderSizePixel = 0
+	MovingFrame.Position = UDim2.new(1, 0, 0.5, 0)
+	MovingFrame.Size = UDim2.new(1, 30, 1, 0)
+
+	Compkiller:Drag(MovingFrame,Keybinds,0.1);
+
+	local Ref = {
+		Root = Keybinds
+	};
+
+	Ref.THREAD = task.spawn(function()
+		while true do task.wait()
+			Compkiller:_Animation(MainFrame,TweenInfo.new(0.4),{
+				Size = UDim2.new(1, 30, 1, UIListLayout.AbsoluteContentSize.Y + 1)
+			});
+
+			if UIListLayout.AbsoluteContentSize.Y > 1 then
+				Compkiller:_Animation(IconFrame,TweenInfo.new(0.25),{
+					BackgroundTransparency = 0.3
+				})
+
+				Compkiller:_Animation(Frame,TweenInfo.new(0.25),{
+					BackgroundTransparency = 0
+				})
+
+				Compkiller:_Animation(HeadLabel,TweenInfo.new(0.25),{
+					TextTransparency = 0
+				})
+
+				Compkiller:_Animation(Icon,TweenInfo.new(0.25),{
+					ImageTransparency = 0
+				});
+
+				local LargF = 100;
+
+				for i,v in next , MainFrame:GetChildren() do
+					if v:GetAttribute('AvgScale') then
+						if v:GetAttribute('AvgScale') > LargF then
+							LargF = v:GetAttribute('AvgScale');
+						end;
+					end;
+				end;
+
+				Compkiller:_Animation(Keybinds,TweenInfo.new(0.25),{
+					BackgroundTransparency = 0.025,
+					Size = UDim2.new(0, LargF, 0, 25)
+				})
+			else
+				Compkiller:_Animation(HeadLabel,TweenInfo.new(0.25),{
+					TextTransparency = 1
+				})
+
+				Compkiller:_Animation(Keybinds,TweenInfo.new(0.25),{
+					BackgroundTransparency = 1
+				})
+
+				Compkiller:_Animation(IconFrame,TweenInfo.new(0.25),{
+					BackgroundTransparency = 1
+				})
+
+				Compkiller:_Animation(Frame,TweenInfo.new(0.25),{
+					BackgroundTransparency = 1
+				})
+
+				Compkiller:_Animation(Icon,TweenInfo.new(0.25),{
+					ImageTransparency = 1
+				});
+			end;
+
+			Keybinds.Visible = (Keybinds.BackgroundTransparency < 0.9 and true) or false;
+
+			if Compkiller.PerformanceMode then
+				if Keybinds.Visible then
+					Compkiller:_SetNilP(Keybinds , Window);
+				else
+					Compkiller:_SetNilP(Keybinds , nil);
+				end;
+			else
+				Compkiller:_SetNilP(Keybinds , Window);
+			end;
+		end;
 	end);
 
-	return Args;
+	function Ref:AddFrame()
+		local Keyholder = Instance.new("Frame")
+		local UICorner = Instance.new("UICorner")
+		local Label = Instance.new("TextLabel")
+		local Line = Instance.new("Frame")
+		local TypeLabel = Instance.new("TextLabel")
+		local UICorner_2 = Instance.new("UICorner")
+
+		Keyholder.Name = Compkiller:_RandomString()
+		Keyholder.BackgroundColor3 = Compkiller.Colors.BGDBColor
+		Keyholder.BackgroundTransparency = 1
+		Keyholder.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Keyholder.BorderSizePixel = 0
+		Keyholder.Size = UDim2.new(1, 0, 0, 28)
+		Keyholder.ZIndex = MainFrame.ZIndex + 3
+		Keyholder.ClipsDescendants = true;
+
+		table.insert(Compkiller.Elements.BGDBColor,{
+			Element = Keyholder,
+			Property = 'BackgroundColor3'
+		});
+
+		UICorner.CornerRadius = UDim.new(0, 3)
+		UICorner.Parent = Keyholder
+
+		Label.Name = Compkiller:_RandomString()
+		Label.Parent = Keyholder
+		Label.AnchorPoint = Vector2.new(0.5, 0.5)
+		Label.BackgroundTransparency = 1.000
+		Label.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Label.BorderSizePixel = 0
+		Label.Position = UDim2.new(0.5, 0, 0.5, 0)
+		Label.Size = UDim2.new(1, -10, 1, 0)
+		Label.ZIndex = MainFrame.ZIndex + 5;
+		Label.Font = Enum.Font.GothamMedium
+		Label.TextColor3 = Compkiller.Colors.SwitchColor
+		Label.TextSize = 11.000
+		Label.TextTransparency = 1
+		Label.TextXAlignment = Enum.TextXAlignment.Left
+
+		table.insert(Compkiller.Elements.SwitchColor,{
+			Element = Label,
+			Property = 'TextColor3'
+		});
+
+		Line.Name = Compkiller:_RandomString()
+		Line.Parent = Keyholder
+		Line.AnchorPoint = Vector2.new(1, 0.5)
+		Line.BackgroundColor3 = Compkiller.Colors.BGDBColor
+		Line.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Line.BorderSizePixel = 0
+		Line.Position = UDim2.new(1, 0, 0.5, 0)
+		Line.Size = UDim2.new(0, 30, 1, 0)
+		Line.ZIndex = MainFrame.ZIndex + 4
+
+		table.insert(Compkiller.Elements.BGDBColor,{
+			Element = Line,
+			Property = 'BackgroundColor3'
+		});
+
+		TypeLabel.Name = Compkiller:_RandomString()
+		TypeLabel.Parent = Line
+		TypeLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+		TypeLabel.BackgroundTransparency = 1.000
+		TypeLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TypeLabel.BorderSizePixel = 0
+		TypeLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+		TypeLabel.Size = UDim2.new(1, 0, 1, 0)
+		TypeLabel.ZIndex = MainFrame.ZIndex + 6
+		TypeLabel.Font = Enum.Font.GothamMedium
+		TypeLabel.TextColor3 = Compkiller.Colors.SwitchColor
+		TypeLabel.TextSize = 11.000
+
+		table.insert(Compkiller.Elements.SwitchColor,{
+			Element = TypeLabel,
+			Property = 'TextColor3'
+		});
+
+		UICorner_2.CornerRadius = UDim.new(0, 3)
+		UICorner_2.Parent = Line
+
+		local UpdateScale = function()
+			local t = TextService:GetTextSize(TypeLabel.Text , TypeLabel.TextSize , TypeLabel.Font , Vector2.new(math.huge,math.huge));
+			local z = TextService:GetTextSize(Label.Text , Label.TextSize , Label.Font , Vector2.new(math.huge,math.huge));
+
+			Line.Size = UDim2.new(0, t.X + 5, 1, 0);
+
+			Keyholder:SetAttribute('AvgScale',(t.X + z.X) + 55);
+		end;
+
+		UpdateScale();
+
+		local frame_ref = {};
+
+		function frame_ref:SetName(str: string)
+			Label.Text = str or Label.Text;
+
+			UpdateScale();
+		end;
+
+		function frame_ref:SetType(str: string)
+			TypeLabel.Text = str or TypeLabel.Text;
+
+			UpdateScale();
+		end;
+
+		function frame_ref:SetVisible(v)
+			if v then
+				Compkiller:_Animation(Keyholder,TweenInfo.new(0.1),{
+					BackgroundTransparency = 0.600,
+					Size = UDim2.new(1, 0, 0, 28)
+				});
+
+				Compkiller:_Animation(Label,TweenInfo.new(0.15),{
+					TextTransparency = 0.100
+				});
+
+				Compkiller:_Animation(Line,TweenInfo.new(0.15),{
+					BackgroundTransparency = 0
+				});
+
+				Compkiller:_Animation(TypeLabel,TweenInfo.new(0.15),{
+					TextTransparency = 0
+				});
+			else
+				Compkiller:_Animation(Keyholder,TweenInfo.new(0.1),{
+					BackgroundTransparency = 1,
+					Size = UDim2.new(1, 0, 0, 0)
+				});
+
+				Compkiller:_Animation(Label,TweenInfo.new(0.15),{
+					TextTransparency = 1
+				});
+
+				Compkiller:_Animation(Line,TweenInfo.new(0.15),{
+					BackgroundTransparency = 1
+				});
+
+				Compkiller:_Animation(TypeLabel,TweenInfo.new(0.15),{
+					TextTransparency = 1
+				});
+			end;
+
+			if Keyholder.BackgroundTransparency <= 0.95 then
+				Keyholder.Parent = MainFrame;
+			else
+				Keyholder.Parent = nil;
+			end;
+
+			UpdateScale();
+		end;
+
+		return frame_ref;
+	end;
+
+	Compkiller.__KEYBINDS_CACHE = Ref;
+
+	return Ref;
+end;
+
+function Compkiller:_KeybindHandler(Parent: Frame , ObjectType: string , ElementAPI: Toggle & Slider , Signal , Zindex: number , ElementCFG: Slider)
+	local Window = Compkiller:_GetWindowFromElement(Parent);
+	local KB_Signal = Compkiller.__SIGNAL(false);
+	local SubIndex = math.random(40,100);
+	local KeybindInd = Compkiller:_DrawKeybinds(Window);
+	local KeybindFrame = KeybindInd:AddFrame();
+
+	local KeybindHandler = Instance.new("Frame")
+	local UIStroke = Instance.new("UIStroke")
+	local UICorner = Instance.new("UICorner")
+	local ElementObjs = Instance.new("Frame")
+	local UIListLayout = Instance.new("UIListLayout")
+
+	KeybindHandler.Name = Compkiller:_RandomString()
+	KeybindHandler.Parent = Window
+	KeybindHandler.BackgroundColor3 = Compkiller.Colors.BlockBackground
+	KeybindHandler.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	KeybindHandler.BorderSizePixel = 0
+	KeybindHandler.ClipsDescendants = true
+	KeybindHandler.Position = UDim2.new(1,999,1,999)
+	KeybindHandler.Size = UDim2.new(0, 225, 0, 0)
+	KeybindHandler.ZIndex = Zindex + SubIndex
+	KeybindHandler.AnchorPoint = Vector2.new(0.5,0)
+
+	table.insert(Compkiller.Elements.BlockBackground,{
+		Element = KeybindHandler,
+		Property = 'BackgroundColor3'
+	});
+
+	UIStroke.Color = Compkiller.Colors.HighStrokeColor
+	UIStroke.Parent = KeybindHandler
+
+	table.insert(Compkiller.Elements.HighStrokeColor,{
+		Element = UIStroke,
+		Property = 'Color'
+	});
+
+	UICorner.CornerRadius = UDim.new(0, 6)
+	UICorner.Parent = KeybindHandler
+
+	ElementObjs.Name = Compkiller:_RandomString()
+	ElementObjs.Parent = KeybindHandler
+	ElementObjs.AnchorPoint = Vector2.new(0.5, 0.5)
+	ElementObjs.BackgroundTransparency = 1.000
+	ElementObjs.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	ElementObjs.BorderSizePixel = 0
+	ElementObjs.Position = UDim2.new(0.5, 0, 0.5, 0)
+	ElementObjs.Size = UDim2.new(1, -5, 1, -5)
+	ElementObjs.ZIndex = Zindex + SubIndex + 10
+
+	UIListLayout.Parent = ElementObjs
+	UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+	local refreshPF = function()
+		if Compkiller.PerformanceMode then
+			if KeybindHandler.Size.Y.Offset > 1 then
+				Compkiller:_SetNilP(KeybindHandler , Window);
+			else
+				Compkiller:_SetNilP(KeybindHandler , nil);
+			end;
+		else
+			Compkiller:_SetNilP(KeybindHandler , Window);
+		end;
+	end;
+
+	KeybindHandler:GetPropertyChangedSignal('Size'):Connect(refreshPF);
+
+	task.delay(0.1,refreshPF);
+
+	local ToggleUI = function(bool)
+		if bool then
+			KeybindHandler.Position = UDim2.new(0,Parent.AbsolutePosition.X + 225,0,Parent.AbsolutePosition.Y)
+
+			Compkiller:_Animation(KeybindHandler,TweenInfo.new(0.25),{
+				BackgroundTransparency = 0,
+				Size = UDim2.new(0, 225, 0, UIListLayout.AbsoluteContentSize.Y + 5)
+			});
+
+			Compkiller:_Animation(UIStroke,TweenInfo.new(0.3),{
+				Transparency = 0
+			});
+		else
+			Compkiller:_Animation(KeybindHandler,TweenInfo.new(0.3),{
+				BackgroundTransparency = 1,
+				Size = UDim2.new(0, 225, 0, 0)
+			});
+
+			Compkiller:_Animation(UIStroke,TweenInfo.new(0.3),{
+				Transparency = 1
+			});
+		end;
+	end;
+
+	ToggleUI(false);
+
+	KB_Signal:Connect(ToggleUI);
+
+	local APIRef = {
+		Name = ElementAPI:GetText()
+	};
+
+	local ModeEnum = {
+		[1] = 'Off', -- disabled / off
+		[2] = "Hold",
+		[3] = "Toggle",
+		[4] = "On", -- alway on
+	};
+
+	local e_m = {
+		['Off'] = 1,
+		['Hold'] = 2,
+		['Toggle'] = 3,
+		['On'] = 4,
+	};
+
+	if ObjectType == "Toggle" then
+		APIRef.Off = false;
+		APIRef.On = true;
+		APIRef.Keybind = nil;
+		APIRef.Mode = e_m.Off;
+
+
+	elseif ObjectType == "Number" then
+		APIRef.Off = 1;
+		APIRef.On = 0;
+		APIRef.Keybind = nil;
+		APIRef.Mode = e_m.Off;
+	end;
+
+	local Flag = {};
+
+	APIRef.Update = function()
+		KeybindFrame:SetName(APIRef.Name);
+		KeybindFrame:SetType(ModeEnum[APIRef.Mode]);
+	end
+
+	local ElementAPIs = Compkiller:_LoadElement(ElementObjs , true , KB_Signal , true);
+
+	Flag.Key = ElementAPIs:AddKeybind({
+		Name = "Key",
+		Default = APIRef.Keybind,
+		Callback = function(v)
+			APIRef.Keybind = v;
+		end,
+	});
+
+	Flag.Mode = ElementAPIs:AddDropdown({
+		Name = "Mode",
+		Default = ModeEnum[APIRef.Mode],
+		Values = ModeEnum,
+		Callback = function(v)
+			APIRef.Mode = e_m[v];
+
+			if APIRef.Mode == 4 then
+				ElementAPI:SetValue(APIRef.On);
+			end;
+		end,
+	});
+
+	if ObjectType == "Toggle" then
+		Flag.On = ElementAPIs:AddToggle({
+			Name = "ON Value",
+			Default = APIRef.On,
+			Callback = function(v)
+				APIRef.On = v;
+			end,
+		});
+
+		Flag.Off = ElementAPIs:AddToggle({
+			Name = "OFF Value",
+			Default = APIRef.Off,
+			Callback = function(v)
+				APIRef.Off = v;
+			end,
+		});
+	elseif ObjectType == "Number" then
+		Flag.On = ElementAPIs:AddSlider({
+			Name = "ON Value",
+			Default = APIRef.On,
+			Min = ElementCFG.Min,
+			Round = ElementCFG.Round,
+			Max = ElementCFG.Max,
+			Type = ElementCFG.Type,
+			Callback = function(v)
+				APIRef.On = v;
+			end,
+		});
+
+		Flag.Off = ElementAPIs:AddSlider({
+			Name = "OFF Value",
+			Default = APIRef.Off,
+			Min = ElementCFG.Min,
+			Round = ElementCFG.Round,
+			Max = ElementCFG.Max,
+			Type = ElementCFG.Type,
+			Callback = function(v)
+				APIRef.Off = v;
+			end,
+		});
+	end;
+
+	Flag.ShowInKeybindList = ElementAPIs:AddTextBox({
+		Name = "Name",
+		Default = APIRef.Name,
+		Placeholder = "Keybind Name",
+		Callback = function(v)
+			APIRef.Name = v;
+		end,
+	})
+
+	function APIRef:GetSettings()
+		APIRef.Update();
+
+		return {
+			Key = APIRef.Keybind,
+			On = APIRef.On,
+			Off = APIRef.Off,
+			Mode = APIRef.Mode,
+			Name = APIRef.Name,
+		};
+	end;
+
+	function APIRef:LoadSettings(cfg : KeybindSettings)
+		Flag.ShowInKeybindList:SetValue(cfg.Name);
+		Flag.Off:SetValue(cfg.Off);
+		Flag.On:SetValue(cfg.On);
+		Flag.Mode:SetValue(ModeEnum[cfg.Mode]);
+		Flag.Key:SetValue(cfg.Key);
+
+		APIRef.Update();
+	end;
+
+	APIRef.Thread = task.spawn(function()
+		while true do task.wait(0.01)
+			if APIRef.Mode ~= 1 then
+				if ElementAPI:GetValue() == APIRef.On then
+					KeybindFrame:SetVisible(true);
+				else
+					KeybindFrame:SetVisible(false);
+				end;
+
+				APIRef.Update();
+			else
+				KeybindFrame:SetVisible(false);
+			end;
+		end;
+	end)
+
+	Parent.InputEnded:Connect(function(Input,Typing)
+		if Input.UserInputType == Enum.UserInputType.MouseButton2 and not Typing then
+			KB_Signal:Fire(true);
+		end;
+	end);
+
+	UserInputService.InputBegan:Connect(function(Input)
+		if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.MouseButton2 or Input.UserInputType == Enum.UserInputType.Touch then
+			if not Compkiller:_IsMouseOverFrame(Parent) and not Compkiller:_IsMouseOverFrame(KeybindHandler) then
+				KB_Signal:Fire(false);
+			end;
+		end;
+	end);
+
+	UserInputService.InputBegan:Connect(function(Input,Typing)
+		if Input.KeyCode.Name == APIRef.Keybind or Input.KeyCode == APIRef.Keybind or (Input.UserInputType == Enum.UserInputType.MouseButton1 and APIRef.Keybind == "MouseLeft") or (Input.UserInputType == Enum.UserInputType.MouseButton2 and APIRef.Keybind == "MouseRight") then
+
+			if APIRef.Mode == 2 or APIRef.Mode == 4 then
+				ElementAPI:SetValue(APIRef.On);
+			elseif APIRef.Mode == 3 then
+				if ElementAPI:GetValue() == APIRef.On then
+					ElementAPI:SetValue(APIRef.Off);
+				else
+					ElementAPI:SetValue(APIRef.On);
+				end;
+			end;
+		end;
+	end);
+
+	UserInputService.InputEnded:Connect(function(Input,Typing)
+		if Input.KeyCode.Name == APIRef.Keybind or Input.KeyCode == APIRef.Keybind or (Input.UserInputType == Enum.UserInputType.MouseButton1 and APIRef.Keybind == "MouseLeft") or (Input.UserInputType == Enum.UserInputType.MouseButton2 and APIRef.Keybind == "MouseRight") then
+
+			if APIRef.Mode == 2 then
+				ElementAPI:SetValue(APIRef.Off);
+			elseif APIRef.Mode == 4 then
+				ElementAPI:SetValue(APIRef.On);
+			end;
+		end;
+	end);
+
+	return APIRef;
 end;
 
 function Compkiller:_AddPropertyEvent(Target: Frame , Callback: (boolean) -> any)
@@ -3109,17 +3934,9 @@ function Compkiller:_LoadOption(Value , TabSignal)
 			Keybind.SetValue("...");
 
 			local Selected = nil;
-			local EscReset = false;
 
-			Compkiller._IsCapturingKey = true;
-			IsBinding = true;
 			while not Selected do
 				local Key = UserInputService.InputBegan:Wait();
-
-				if Key.KeyCode == Enum.KeyCode.Escape then
-					EscReset = true
-					break
-				end
 
 				if Key.KeyCode ~= Enum.KeyCode.Unknown and not IsBlacklist(Key.KeyCode) and not IsBlacklist(Key.KeyCode.Name) then
 					Selected = Key.KeyCode;
@@ -3132,15 +3949,6 @@ function Compkiller:_LoadOption(Value , TabSignal)
 				end;
 			end;
 
-			if EscReset then
-				Config.Default = nil;
-				Keybind.SetValue(nil);
-				IsBinding = false;
-				Compkiller._IsCapturingKey = false;
-				Config.Callback(nil);
-				return
-			end
-
 			local KeyName = (typeof(Selected) == "string" and Selected) or Selected.Name;
 
 			Config.Default = KeyName;
@@ -3148,7 +3956,6 @@ function Compkiller:_LoadOption(Value , TabSignal)
 			Keybind.SetValue(Selected);
 
 			IsBinding = false;
-			Compkiller._IsCapturingKey = false;
 
 			Config.Callback(KeyName);
 		end);
@@ -3191,6 +3998,16 @@ function Compkiller:_LoadOption(Value , TabSignal)
 				Helper.Text.Visible = false;
 			else
 				Helper.Text.Visible = true;
+			end;
+
+			if Compkiller.PerformanceMode then
+				if Helper.Text.Visible then
+					Compkiller:_SetNilP(Helper.Text , Window);
+				else
+					Compkiller:_SetNilP(Helper.Text , nil);
+				end;
+			else
+				Compkiller:_SetNilP(Helper.Text , Window);
 			end;
 		end)
 
@@ -3415,6 +4232,16 @@ function Compkiller:_LoadOption(Value , TabSignal)
 
 		Compkiller:_AddPropertyEvent(ExtractElement,function(bool)
 			ExtractElement.Visible = bool;
+
+			if Compkiller.PerformanceMode then
+				if ExtractElement.Visible then
+					Compkiller:_SetNilP(ExtractElement , Window);
+				else
+					Compkiller:_SetNilP(ExtractElement , nil);
+				end;
+			else
+				Compkiller:_SetNilP(ExtractElement , Window);
+			end;
 		end);
 
 		Compkiller:_AddDragBlacklist(ExtractElement);
@@ -3484,6 +4311,7 @@ end;
 
 function Compkiller:_LoadDropdown(BaseParent: TextButton , Callback: () -> any)
 	local Window = Compkiller:_GetWindowFromElement(BaseParent);
+
 	local BaseZ_Index = BaseParent.ZIndex + (math.random(1,15) * 100);
 
 	local DropdownWindow = Instance.new("Frame")
@@ -3502,7 +4330,6 @@ function Compkiller:_LoadDropdown(BaseParent: TextButton , Callback: () -> any)
 	DropdownWindow.Position = UDim2.new(123, 0, 123, 0)
 	DropdownWindow.Size = UDim2.new(0, 190, 0, 200)
 	DropdownWindow.ZIndex = BaseZ_Index
-	DropdownWindow.Active = true
 
 	table.insert(Compkiller.Elements.BlockBackground,{
 		Element = DropdownWindow,
@@ -3512,6 +4339,16 @@ function Compkiller:_LoadDropdown(BaseParent: TextButton , Callback: () -> any)
 	Compkiller:_AddDragBlacklist(DropdownWindow);
 	Compkiller:_AddPropertyEvent(DropdownWindow,function(v)
 		DropdownWindow.Visible = v;
+
+		if Compkiller.PerformanceMode then
+			if DropdownWindow.Visible then
+				Compkiller:_SetNilP(DropdownWindow , Window);
+			else
+				Compkiller:_SetNilP(DropdownWindow , nil);
+			end;
+		else
+			Compkiller:_SetNilP(DropdownWindow , Window);
+		end;
 	end)
 
 	UIStroke.Color = Compkiller.Colors.HighStrokeColor
@@ -3537,16 +4374,6 @@ function Compkiller:_LoadDropdown(BaseParent: TextButton , Callback: () -> any)
 	ScrollingFrame.BottomImage = ""
 	ScrollingFrame.ScrollBarThickness = 0
 	ScrollingFrame.TopImage = ""
-	
-	-- Prevent click-through by consuming mouse events
-	local clickBlocker = Instance.new("TextButton")
-	clickBlocker.Name = "ClickBlocker"
-	clickBlocker.Parent = DropdownWindow
-	clickBlocker.BackgroundTransparency = 1
-	clickBlocker.Size = UDim2.new(1, 0, 1, 0)
-	clickBlocker.ZIndex = BaseZ_Index - 1
-	clickBlocker.Text = ""
-	clickBlocker.AutoButtonColor = false
 
 	UIListLayout.Parent = ScrollingFrame
 	UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -3623,7 +4450,6 @@ function Compkiller:_LoadDropdown(BaseParent: TextButton , Callback: () -> any)
 		DropdownItem.BorderSizePixel = 0
 		DropdownItem.Size = UDim2.new(1, -1, 0, 20)
 		DropdownItem.ZIndex = BaseZ_Index + 6
-		DropdownItem.Active = true
 
 		BlockText.Name = Compkiller:_RandomString()
 		BlockText.Parent = DropdownItem
@@ -3827,20 +4653,12 @@ function Compkiller:_LoadDropdown(BaseParent: TextButton , Callback: () -> any)
 		UpdateDropdown();
 	end;
 
-	function Args:Close()
-		ToggleUI(false);
-	end;
-
-	Compkiller:_RegisterOverlay(Window , function()
-		ToggleUI(false);
-	end);
-
 	Args.EventOut = EventOut;
 
 	return Args;
 end;
 
-function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
+function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal , DisableStackKeybind)
 	local Zindex = Parent.ZIndex + 1;
 	local Tween = TweenInfo.new(0.25,Enum.EasingStyle.Quint);
 
@@ -3881,9 +4699,6 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			Config.Callback(Config.Default);
 		end);
 
-		-- Set initial UI to reflect default state
-		Block:SetTransparency((Config.Default and 0.1) or 0.3);
-
 		local Args = {};
 
 		Args.Flag = Config.Flag;
@@ -3895,10 +4710,7 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 
 			Block:SetTransparency((Config.Default and 0.1) or 0.3);
 
-			-- Ensure callback is triggered (including when loading from config)
-			task.defer(function()
-				Config.Callback(Config.Default);
-			end);
+			Config.Callback(Config.Default);
 		end;
 
 		Args.Signal = Signal:Connect(function(bool)
@@ -3908,40 +4720,26 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 
 		Args.Link = Compkiller:_LoadOption(Block);
 
-		-- Convenience methods for runtime control
-		function Args:Toggle()
-			self:SetValue(not self:GetValue())
-		end
-
-		function Args:BindKey(keyName)
-			Compkiller:_BindToggleKey(Args, keyName)
-		end
-
-		-- Auto keybind option for each Toggle (adds a Keybind selector in the option row)
-		do
-			local defaultKey = rawget(Config, "KeybindDefault") or rawget(Config, "Keybind") or nil
-			Args._KeybindOption = Args.Link:AddKeybind({
-				Name = "Keybind",
-				Default = defaultKey,
-				Flag = nil,
-				Callback = function(key)
-					Args:BindKey(key)
-				end
-			})
-
-			if defaultKey then
-				Args:BindKey(defaultKey)
-			end
-		end
-
-		
-		
 		function Args:GetValue()
 			return Config.Default;
 		end;
 
+		function Args:SetText(str : string)
+			Block:SetText(str or Config.Name);
+		end;
+
+		function Args:GetText()
+			return Block:GetText();
+		end;
+
 		if Config.Flag then
 			Compkiller.Flags[Config.Flag] = Args;
+		end;
+
+		if not DisableStackKeybind then
+			local AutoKeybind = Compkiller:_KeybindHandler(Block.Root , "Toggle" , Args , Signal , Zindex , Config);
+
+			Args.AutoKeybind = AutoKeybind;
 		end;
 
 		return Args;
@@ -3983,8 +4781,6 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 
 			local Selected = nil;
 
-			Compkiller._IsCapturingKey = true;
-			IsBinding = true;
 			while not Selected do
 				local Key = UserInputService.InputBegan:Wait();
 
@@ -4006,7 +4802,6 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			Keybind.SetValue(Selected);
 
 			IsBinding = false;
-			Compkiller._IsCapturingKey = false;
 
 			Config.Callback(KeyName);
 		end);
@@ -4014,6 +4809,14 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 		local Args = {};
 
 		Args.Flag = Config.Flag;
+
+		function Args:SetText(str : string)
+			Block:SetText(str or Config.Name);
+		end;
+
+		function Args:GetText()
+			return Block:GetText();
+		end;
 
 		function Args:SetValue(value)
 			Config.Default = value;
@@ -4088,6 +4891,14 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			ColorPicker:Update();
 
 			Config.Callback(value,opc);
+		end;
+
+		function Args:SetText(str : string)
+			Block:SetText(str or Config.Name);
+		end;
+
+		function Args:GetText()
+			return Block:GetText();
 		end;
 
 		Args.Signal = Signal:Connect(function(bool)
@@ -4260,6 +5071,10 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 		function Args:SetText(t)
 			Config.Name = t;
 			TextLabel.Text = Config.Name;
+		end;
+
+		function Args:GetText()
+			return TextLabel.Text;
 		end;
 
 		return Args;
@@ -4514,6 +5329,14 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			Config.Callback(Value);
 		end;
 
+		function Args:SetText(str : string)
+			BlockText.Text = str or Config.Name
+		end;
+
+		function Args:GetText()
+			return BlockText.Text;
+		end;
+
 		Args.Signal = Signal:Connect(function(bool)
 			if bool then
 				Compkiller:_Animation(SliderInput, TweenInfo.new(0.35),{
@@ -4590,13 +5413,19 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			Compkiller.Flags[Config.Flag] = Args;
 		end;
 
+		if not DisableStackKeybind then
+			local AutoKeybind = Compkiller:_KeybindHandler(Slider , "Number" , Args , Signal , Zindex , Config);
+
+			Args.AutoKeybind = AutoKeybind;
+		end;
+
 		return Args;
 	end;
 
 	function Args:AddParagraph(Config: Paragraph) -- request by Neptune
 		Config = Compkiller.__CONFIG(Config, {
 			Title = "Paragraph",
-			Content = ""
+			Content = "",
 		});
 
 		local Paragraph = Instance.new("Frame")
@@ -4862,9 +5691,17 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 
 			local MainScale = ((scale.X > Base.X) and scale.X) or Base.X;
 
-			Compkiller:_Animation(LinkValues,TweenInfo.new(0.25),{
-				Size = UDim2.fromOffset(math.clamp(MainScale + 7 , Base.X , TextBox.AbsoluteSize.X / 2) , 16)
-			})
+			local xp = pcall(function()
+				Compkiller:_Animation(LinkValues,TweenInfo.new(0.25),{
+					Size = UDim2.fromOffset(math.clamp(MainScale + 7 , Base.X , TextBox.AbsoluteSize.X / 2) , 16)
+				})
+			end);
+
+			if not xp then
+				Compkiller:_Animation(LinkValues,TweenInfo.new(0.25),{
+					Size = UDim2.fromOffset(MainScale + 7 , 16)
+				})
+			end;
 		end;
 
 		local parse = function(text)
@@ -4909,6 +5746,14 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 		local Args = {};
 
 		Args.Flag = Config.Flag;
+
+		function Args:SetText(str : string)
+			BlockText.Text = str or Config.Name
+		end;
+
+		function Args:GetText()
+			return BlockText.Text;
+		end;
 
 		function Args:SetValue(Value)
 			Config.Default = Value;
@@ -4976,60 +5821,37 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			Callback = function() end;
 		});
 
-		
-		local function PrettyDropdownValue(raw)
-			if not raw then return "None" end
-
-			local v = raw
-			if typeof(raw) == "table" then
-				if raw[1] ~= nil then
-					v = raw[1]
-				end
-			end
-
-			v = tostring(v)
-
-			if v == "NIL" or v == "nil" then
-				return "None"
-			end
-
-			return v
-		end
-
 		local DaTabarser = function(value)
-			if not value then
-				return "None"
-			end
+			if not value then return ''; end;
 
-			local Out
+			local Out;
 
-			if typeof(value) == "table" then
+			if typeof(value) == 'table' then
 				if #value > 0 then
-					local x = {}
+					local x = {};
 
-					for _, v in next, value do
-						table.insert(x, PrettyDropdownValue(v))
-					end
+					for i,v in next , value do
+						table.insert(x , tostring(v))
+					end;
 
-					Out = table.concat(x, " , ")
+					Out = table.concat(x,' , ');
 				else
-					local x = {}
+					local x = {};
 
-					for i, v in next, value do
+					for i,v in next , value do
 						if v == true then
-							table.insert(x, PrettyDropdownValue(i))
-						end
-					end
+							table.insert(x , tostring(i));
+						end			
+					end;
 
-					Out = table.concat(x, " , ")
-				end
+					Out = table.concat(x,' , ');
+				end;
 			else
-				Out = PrettyDropdownValue(value)
-			end
+				Out = tostring(value);
+			end;
 
-			return Out
-		end
-	
+			return Out;
+		end;
 
 		local Dropdown = Instance.new("Frame")
 		local BlockText = Instance.new("TextLabel")
@@ -5117,7 +5939,6 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 		ValueItems.Position = UDim2.new(0.5, 0, 1, -7)
 		ValueItems.Size = UDim2.new(1, -25, 0, 18)
 		ValueItems.ZIndex = Zindex + 5
-		ValueItems.Visible = true
 
 		table.insert(Compkiller.Elements.DropColor , {
 			Element = ValueItems,
@@ -5164,7 +5985,7 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 		MainButton.Position = UDim2.new(1, -5, 0.5, 0)
 		MainButton.Size = UDim2.new(0, 13, 0, 13)
 		MainButton.ZIndex = Zindex + 5
-		MainButton.Image = "rbxassetid://10709790948"
+		MainButton.Image = Compkiller:CacheImage("rbxassetid://109535175596957")
 
 		Compkiller:_Hover(ValueItems,function()
 			Compkiller:_Animation(ValueItems,TweenInfo.new(0.3),{
@@ -5219,12 +6040,17 @@ function Compkiller:_LoadElement(Parent: Frame , EnabledLine: boolean , Signal)
 			Config.Callback(Value);
 		end;
 
+		function Args:SetText(str : string)
+			BlockText.Text = str or Config.Name
+		end;
+
+
+		function Args:GetText()
+			return BlockText.Text;
+		end;
+
 		function Args:SetValues(v)
-			Config.Values = v or {}; -- пофикси: если nil, то пустой список
-			if not Config.Values then Config.Values = {}; end
-			if not Config.Default or (type(Config.Values) == "table" and #Config.Values > 0 and not table.find(Config.Values, Config.Default)) then
-				Config.Default = Config.Values[1];
-			end
+			Config.Values = v;
 
 			repi:SetData(Config.Default,Config.Values,Config.Multi,true);
 		end;
@@ -5426,13 +6252,6 @@ function Compkiller:RefreshCurrentColor()
 		end;
 	end;
 
-	-- Update Auto buttons color (no state-based recolor)
-	for i,v in next , Compkiller.Elements.AutoButtons do
-		if v.Element and v.Property then
-			v.Element[v.Property] = Compkiller.Colors.Highlight;
-		end;
-	end;
-
 	for i,v in next , Compkiller.Elements.SwitchColor do
 		if v.Element and v.Property and v.Element[v.Property] ~= Compkiller.Colors.MouseEnter then
 			v.Element[v.Property] = Compkiller.Colors.SwitchColor;
@@ -5523,7 +6342,6 @@ function Compkiller.new(Config : Window)
 	local CompKiller = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
 	local UICorner = Instance.new("UICorner")
-	local UIStroke = Instance.new("UIStroke")
 	local TabFrame = Instance.new("Frame")
 	local UICorner_2 = Instance.new("UICorner")
 	local LineFrame1 = Instance.new("Frame")
@@ -5541,20 +6359,22 @@ function Compkiller.new(Config : Window)
 	local ExpireText = Instance.new("TextLabel")
 	local TabMainFrame = Instance.new("Frame")
 
+	Compkiller:_DrawKeybinds(CompKiller);
+
 	UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
 		TabButtonScrollingFrame.CanvasSize = UDim2.fromOffset(0,UIListLayout.AbsoluteContentSize.Y)
 	end);
 
-	CompKiller.Name = "u?name=compkiller_"..Compkiller:_RandomString();
+	CompKiller.Name = "u?name=compkiller_?"..Compkiller:_RandomString();
 	CompKiller.Parent = CoreGui;
 	CompKiller.ResetOnSpawn = false
 	CompKiller.IgnoreGuiInset = true;
 	CompKiller.ZIndexBehavior = Enum.ZIndexBehavior.Global;
-	
+
 	Compkiller.ProtectGui(CompKiller);
-	
+
 	WindowArgs.Root = CompKiller;
-	
+
 	table.insert(Compkiller.Windows , CompKiller);
 
 	MainFrame.Active = true;
@@ -5586,21 +6406,9 @@ function Compkiller.new(Config : Window)
 		Size = Config.Scale
 	});
 
-	UICorner.CornerRadius = UDim.new(0, 10)
 	UICorner.Parent = MainFrame
 
-	UIStroke.Color = Compkiller.Colors.StrokeColor
-	UIStroke.Transparency = 0.5
-	UIStroke.Thickness = 1
-	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	UIStroke.Parent = MainFrame
-
-	table.insert(Compkiller.Elements.StrokeColor,{
-		Element = UIStroke,
-		Property = "Color"
-	});
-
-	local TabFrameBaseTrans = 0.18;
+	local TabFrameBaseTrans = 0.25;
 
 	TabFrame.Active = true
 	TabFrame.Name = Compkiller:_RandomString()
@@ -5620,7 +6428,6 @@ function Compkiller.new(Config : Window)
 	TabFrame.Position = UDim2.new(0, 25, 0, 0)
 	TabFrame.Size = UDim2.new(0, 85, 1, 0)
 
-	UICorner_2.CornerRadius = UDim.new(0, 10)
 	UICorner_2.Parent = TabFrame
 
 	LineFrame1.Name = Compkiller:_RandomString()
@@ -5646,7 +6453,16 @@ function Compkiller.new(Config : Window)
 	CompLogo.Position = UDim2.new(0, 9, 0, 7)
 	CompLogo.Size = UDim2.new(0, 45, 0, 45)
 	CompLogo.Image = Config.Logo
-
+	
+	if Compkiller.CustomHighlightMode then
+		CompLogo.ImageColor3 = Compkiller.Colors.Highlight;
+		
+		table.insert(Compkiller.Elements.Highlight , {
+			Element = CompLogo,
+			Property = 'ImageColor3'
+		});
+	end;
+	
 	WindowLabel.Name = Compkiller:_RandomString()
 	WindowLabel.Parent = TabFrame
 	WindowLabel.BackgroundTransparency = 1.000
@@ -5680,7 +6496,7 @@ function Compkiller.new(Config : Window)
 	SelectionFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	SelectionFrame.BorderSizePixel = 0
 	SelectionFrame.Position = UDim2.new(1, 5, 0, 28)
-	SelectionFrame.Size = UDim2.new(0, 8, 0, 32)
+	SelectionFrame.Size = UDim2.new(0, 8, 0, 27)
 
 	table.insert(Compkiller.Elements.Highlight,{
 		Element = SelectionFrame,
@@ -5700,8 +6516,7 @@ function Compkiller.new(Config : Window)
 	TabButtonScrollingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	TabButtonScrollingFrame.Size = UDim2.new(1, -5, 1, -5)
 	TabButtonScrollingFrame.BottomImage = ""
-	TabButtonScrollingFrame.ScrollBarThickness = 3
-	TabButtonScrollingFrame.ScrollBarImageTransparency = 0.5
+	TabButtonScrollingFrame.ScrollBarThickness = 0
 	TabButtonScrollingFrame.TopImage = ""
 
 	UIListLayout.Parent = TabButtonScrollingFrame
@@ -5718,6 +6533,42 @@ function Compkiller.new(Config : Window)
 	Userinfo.Position = UDim2.new(0, 0, 1, 0)
 	Userinfo.Size = UDim2.new(1, -25, 0, 60)
 
+	do
+		local Highlight = Instance.new("Frame")
+		local UICorner = Instance.new("UICorner")
+
+		Highlight.Name = Compkiller:_RandomString()
+		Highlight.Parent = Userinfo
+		Highlight.AnchorPoint = Vector2.new(0.5, 0)
+		Highlight.BackgroundColor3 = Color3.fromRGB(161, 161, 161)
+		Highlight.BackgroundTransparency = 1
+		Highlight.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Highlight.BorderSizePixel = 0
+		Highlight.Position = UDim2.new(0.5, 0, 0, 4)
+		Highlight.Size = UDim2.new(1, -15, 1, -15)
+
+		UICorner.CornerRadius = UDim.new(0, 4)
+		UICorner.Parent = Highlight
+
+		Userinfo.MouseEnter:Connect(function()
+			Compkiller:_Animation(Highlight,TweenInfo.new(0.2),{
+				BackgroundTransparency = 0.925
+			});
+		end);
+
+		Userinfo.MouseLeave:Connect(function()
+			Compkiller:_Animation(Highlight,TweenInfo.new(0.2),{
+				BackgroundTransparency = 1
+			});
+		end);
+
+		Compkiller:_Input(Userinfo,function()
+			if WindowArgs.UserSettings.Root then
+				WindowArgs.UserSettings:Window(true);
+			end;
+		end);
+	end;
+
 	UserProfile.Name = Compkiller:_RandomString()
 	UserProfile.Parent = Userinfo
 	UserProfile.BackgroundTransparency = 1.000
@@ -5726,7 +6577,7 @@ function Compkiller.new(Config : Window)
 	UserProfile.Position = UDim2.new(0, 13, 0, 9)
 	UserProfile.Size = UDim2.new(0, 35, 0, 35)
 	UserProfile.ZIndex = 2
-	UserProfile.Image = "rbxassetid://18518299306"
+	UserProfile.Image = Compkiller:CacheImage("rbxassetid://18518299306")
 
 	UICorner_4.CornerRadius = UDim.new(1, 0)
 	UICorner_4.Parent = UserProfile
@@ -5786,10 +6637,6 @@ function Compkiller.new(Config : Window)
 	end;
 
 	WindowOpen:Connect(function(v)
-		if not v then
-			Compkiller:_CloseOverlays(CompKiller);
-		end;
-
 		if WindowArgs.PerformanceMode then
 			MainFrame.BackgroundTransparency = (v and 0) or 1;
 			return;	
@@ -5924,6 +6771,177 @@ function Compkiller.new(Config : Window)
 		end;
 	end);
 
+	WindowArgs.UserSettings = {};
+
+	do
+		local Signal = Compkiller.__SIGNAL(false);
+
+		local UserSettings = Instance.new("Frame")
+		local UICorner = Instance.new("UICorner")
+		local SectionFrame = Instance.new("Frame")
+		local UICorner_2 = Instance.new("UICorner")
+		local UIListLayout = Instance.new("UIListLayout")
+		local Header = Instance.new("Frame")
+		local HeaderText = Instance.new("TextLabel")
+		local ImageLabel = Instance.new("ImageLabel")
+
+		UserSettings.Name = Compkiller:_RandomString()
+		UserSettings.Parent = CompKiller;
+		UserSettings.BackgroundColor3 = Compkiller.Colors.BGDBColor;
+		UserSettings.BackgroundTransparency = 1
+		UserSettings.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		UserSettings.BorderSizePixel = 0
+		UserSettings.Position = UDim2.new(0, 50, 0, 50)
+		UserSettings.Size = UDim2.new(0, 235, 0, 300)
+		UserSettings.ZIndex = 65;
+		UserSettings.Visible = false;
+
+		table.insert(Compkiller.Elements.BGDBColor,{
+			Element = UserSettings,
+			Property = 'BackgroundColor3'
+		});
+
+		UICorner.CornerRadius = UDim.new(0, 4)
+		UICorner.Parent = UserSettings
+
+		SectionFrame.Name = Compkiller:_RandomString()
+		SectionFrame.Parent = UserSettings
+		SectionFrame.BackgroundColor3 = Compkiller.Colors.BGDBColor;
+		SectionFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		SectionFrame.BorderSizePixel = 0
+		SectionFrame.Position = UDim2.new(0, 0, 0, 45)
+		SectionFrame.Size = UDim2.new(1, 0, 1, -45)
+		SectionFrame.ZIndex = 66
+
+		table.insert(Compkiller.Elements.BGDBColor,{
+			Element = SectionFrame,
+			Property = 'BackgroundColor3'
+		});
+
+		UICorner_2.CornerRadius = UDim.new(0, 4)
+		UICorner_2.Parent = SectionFrame
+
+		UIListLayout.Parent = SectionFrame
+		UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		UIListLayout.Padding = UDim.new(0, 5)
+
+		Header.Name = Compkiller:_RandomString()
+		Header.Parent = UserSettings
+		Header.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		Header.BackgroundTransparency = 1.000
+		Header.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Header.BorderSizePixel = 0
+		Header.Size = UDim2.new(1, 0, 0, 45)
+		Header.ZIndex = 66
+
+		HeaderText.Name = Compkiller:_RandomString()
+		HeaderText.Parent = Header
+		HeaderText.AnchorPoint = Vector2.new(0.5, 0.5)
+		HeaderText.BackgroundTransparency = 1.000
+		HeaderText.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		HeaderText.BorderSizePixel = 0
+		HeaderText.Position = UDim2.new(0.5, 0, 0.5, 0)
+		HeaderText.Size = UDim2.new(0, 200, 0, 25)
+		HeaderText.ZIndex = 67
+		HeaderText.Font = Enum.Font.GothamMedium
+		HeaderText.Text = "User Settings"
+		HeaderText.TextColor3 = Color3.fromRGB(255, 255, 255)
+		HeaderText.TextSize = 15.000
+
+		table.insert(Compkiller.Elements.SwitchColor,{
+			Element = HeaderText,
+			Property = 'TextColor3'
+		});
+
+		ImageLabel.Parent = Header
+		ImageLabel.AnchorPoint = Vector2.new(1, 0)
+		ImageLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		ImageLabel.BackgroundTransparency = 1.000
+		ImageLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		ImageLabel.BorderSizePixel = 0
+		ImageLabel.Position = UDim2.new(1, -5, 0, 5)
+		ImageLabel.Size = UDim2.new(0, 15, 0, 15)
+		ImageLabel.ZIndex = 67
+		ImageLabel.Image = Compkiller:CacheImage("rbxassetid://10747384394")
+		ImageLabel.ImageTransparency = 0.500
+
+		function WindowArgs.UserSettings:Create()
+
+			WindowArgs.UserSettings.Root = UserSettings;
+			WindowArgs.UserSettings.Signal = Signal;
+			WindowArgs.UserSettings.Signal = Compkiller:_Blur(UserSettings,Signal);
+
+			Compkiller:Drag(UserSettings , UserSettings, 0.15);
+
+			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+				Compkiller:_Animation(UserSettings,TweenInfo.new(0.2),{
+					Size = UDim2.new(0, 235, 0, UIListLayout.AbsoluteContentSize.Y + 50)
+				})
+			end);
+
+			UserSettings:GetPropertyChangedSignal('BackgroundTransparency'):Connect(function()
+				if UserSettings.BackgroundTransparency < 1 then
+					UserSettings.Visible = true;
+				else
+					UserSettings.Visible = false;
+				end;
+			end);
+
+			function WindowArgs.UserSettings:Window(Value)
+				if Value then
+					Signal:Fire(true);
+
+					Compkiller:_Animation(UserSettings,TweenInfo.new(0.2),{
+						BackgroundTransparency = 0.250,
+					});
+
+					Compkiller:_Animation(SectionFrame,TweenInfo.new(0.2),{
+						BackgroundTransparency = 0,
+					});
+
+					Compkiller:_Animation(HeaderText,TweenInfo.new(0.2),{
+						TextTransparency = 0,
+					});
+
+					Compkiller:_Animation(ImageLabel,TweenInfo.new(0.2),{
+						ImageTransparency = 0.5,
+					});
+				else
+					Signal:Fire(false);
+
+					Compkiller:_Animation(UserSettings,TweenInfo.new(0.2),{
+						BackgroundTransparency = 1,
+					});
+
+					Compkiller:_Animation(SectionFrame,TweenInfo.new(0.2),{
+						BackgroundTransparency = 1,
+					});
+
+					Compkiller:_Animation(HeaderText,TweenInfo.new(0.2),{
+						TextTransparency = 1,
+					});
+
+					Compkiller:_Animation(ImageLabel,TweenInfo.new(0.2),{
+						ImageTransparency = 1,
+					});
+				end;
+			end;
+
+			Compkiller:_Input(ImageLabel,function()
+				WindowArgs.UserSettings:Window(false);
+			end);
+
+			WindowArgs.UserSettings:Window(false);
+
+			return Compkiller:_LoadElement(SectionFrame , true , Signal);
+		end;
+	end;
+
+	function WindowArgs:SetVisible(bool: boolean)
+		CompKiller.Enabled = bool;
+	end;
+
 	function WindowArgs:DrawCategory(config : Category)
 		config = config or {};
 		config.Name = config.Name or "Category";
@@ -6047,7 +7065,7 @@ function Compkiller.new(Config : Window)
 		Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Icon.BorderSizePixel = 0
 		Icon.Position = UDim2.new(0, 15, 0.5, 0)
-		Icon.Size = UDim2.new(0, 22, 0, 22)
+		Icon.Size = UDim2.new(0, 15, 0, 15)
 		Icon.ZIndex = 3
 		Icon.Image = Compkiller:_GetIcon(TabConfig.Icon);
 		Icon.ImageColor3 = Compkiller.Colors.Highlight
@@ -6080,13 +7098,8 @@ function Compkiller.new(Config : Window)
 		Highlight.Name = Compkiller:_RandomString()
 		Highlight.Parent = TabButton
 		Highlight.AnchorPoint = Vector2.new(0.5, 0.5)
-		Highlight.BackgroundColor3 = Compkiller.Colors.Highlight
+		Highlight.BackgroundColor3 = Color3.fromRGB(161, 161, 161)
 		Highlight.BackgroundTransparency = 0.925
-
-		table.insert(Compkiller.Elements.Highlight,{
-			Element = Highlight,
-			Property = "BackgroundColor3"
-		});
 		Highlight.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Highlight.BorderSizePixel = 0
 		Highlight.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -6145,6 +7158,16 @@ function Compkiller.new(Config : Window)
 			else
 				ContainerTab.Visible = false;
 			end;
+
+			if Compkiller.PerformanceMode then
+				if ContainerTab.Visible then
+					Compkiller:_SetNilP(ContainerTab , TabMainFrame);
+				else
+					Compkiller:_SetNilP(ContainerTab , nil);
+				end;
+			else
+				Compkiller:_SetNilP(ContainerTab , TabMainFrame);
+			end;
 		end);
 
 		local TabOpen = function(bool)
@@ -6160,7 +7183,7 @@ function Compkiller.new(Config : Window)
 				});
 
 				Compkiller:_Animation(Highlight,Tween,{
-					BackgroundTransparency = 0.9
+					BackgroundTransparency = 0.925
 				});
 
 				for i,v in next , TabArgs.Tabs do
@@ -6230,8 +7253,7 @@ function Compkiller.new(Config : Window)
 				});
 
 				Compkiller:_Animation(Icon,Tween,{
-					Position = UDim2.new(0, 15, 0.5, 0),
-					Size = UDim2.new(0, 22, 0, 22),
+					Size = UDim2.new(0, 16, 0, 16),
 				});
 
 				Compkiller:_Animation(TabNameLabel,Tween,{
@@ -6257,8 +7279,7 @@ function Compkiller.new(Config : Window)
 				});
 
 				Compkiller:_Animation(Icon,Tween,{
-					Position = UDim2.new(0, 12, 0.5, 0),
-					Size = UDim2.new(0, 20, 0, 20),
+					Size = UDim2.new(0, 16, 0, 16),
 				});
 
 				Compkiller:_Animation(TabNameLabel,Tween,{
@@ -6470,6 +7491,34 @@ function Compkiller.new(Config : Window)
 			end;
 		end)
 
+		--[[local Parent: ScrollingFrame = UilistLayout.Parent;
+
+		Parent = Parent or Scrolling;
+
+		local Detection = function()
+			local Target = (UilistLayout.AbsoluteContentSize.Y);
+
+			for i,v in next , Parent:GetChildren() do task.wait(0.1)
+				local UIList = v:FindFirstChildWhichIsA('UIListLayout');
+				if v:IsA('Frame') and UIList then
+					if (UIList.AbsoluteContentSize.Y >= Target) or (v.AbsoluteSize.Y >= Target) or (UilistLayout.AbsoluteContentSize.Y > Parent.AbsoluteSize.Y) then
+						UilistLayout.VerticalFlex = Enum.UIFlexAlignment.None;
+						Parent.ScrollingEnabled = true;
+					else
+						Parent.ScrollingEnabled = false;
+						UilistLayout.VerticalFlex = Enum.UIFlexAlignment.None;
+					end;
+				end
+			end;
+		end;
+
+		local Executable = function()
+			while true do task.wait(0.15);
+				pcall(Detection);
+			end;
+		end;
+
+		table.insert(WindowArgs.THREADS,task.spawn(Executable))]]
 	end;
 
 	function WindowArgs:DrawConfig(Configuration : TabConfigManager , Internal)
@@ -6510,7 +7559,7 @@ function Compkiller.new(Config : Window)
 		Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		Icon.BorderSizePixel = 0
 		Icon.Position = UDim2.new(0, 15, 0.5, 0)
-		Icon.Size = UDim2.new(0, 22, 0, 22)
+		Icon.Size = UDim2.new(0, 15, 0, 15)
 		Icon.ZIndex = 3
 		Icon.Image = Compkiller:_GetIcon(Configuration.Icon);
 		Icon.ImageColor3 = Compkiller.Colors.Highlight
@@ -6656,8 +7705,9 @@ function Compkiller.new(Config : Window)
 		SectionClose.Position = UDim2.new(1, -12, 0.5, 0)
 		SectionClose.Size = UDim2.new(0, 17, 0, 17)
 		SectionClose.ZIndex = 10
-		SectionClose.Image = "rbxassetid://10709790948"
+		SectionClose.Image = Compkiller:CacheImage("rbxassetid://109535175596957")
 		SectionClose.ImageTransparency = 0.500
+
 
 		ScrollingFrame.Parent = ConfigList
 		ScrollingFrame.Active = true
@@ -6746,7 +7796,7 @@ function Compkiller.new(Config : Window)
 		SectionClose_2.Position = UDim2.new(1, -12, 0.5, 0)
 		SectionClose_2.Size = UDim2.new(0, 17, 0, 17)
 		SectionClose_2.ZIndex = 10
-		SectionClose_2.Image = "rbxassetid://10709790948"
+		SectionClose_2.Image = Compkiller:CacheImage("rbxassetid://109535175596957")
 		SectionClose_2.ImageTransparency = 0.500
 
 		Frame.Parent = AddConfig
@@ -6877,6 +7927,17 @@ function Compkiller.new(Config : Window)
 			else
 				TabConfig.Visible = false;
 			end;
+
+			if Compkiller.PerformanceMode then
+				if TabConfig.Visible then
+					Compkiller:_SetNilP(TabConfig , TabMainFrame);
+				else
+					Compkiller:_SetNilP(TabConfig , nil);
+				end;
+			else
+				Compkiller:_SetNilP(TabConfig , TabMainFrame);
+			end;
+
 		end)
 
 		local TabOpen = function(bool)
@@ -7078,8 +8139,7 @@ function Compkiller.new(Config : Window)
 				});
 
 				Compkiller:_Animation(Icon,Tween,{
-					Position = UDim2.new(0, 15, 0.5, 0),
-					Size = UDim2.new(0, 22, 0, 22),
+					Size = UDim2.new(0, 16, 0, 16),
 				});
 
 				Compkiller:_Animation(TabNameLabel,Tween,{
@@ -7105,8 +8165,7 @@ function Compkiller.new(Config : Window)
 				});
 
 				Compkiller:_Animation(Icon,Tween,{
-					Position = UDim2.new(0, 12, 0.5, 0),
-					Size = UDim2.new(0, 20, 0, 20),
+					Size = UDim2.new(0, 16, 0, 16),
 				});
 
 				Compkiller:_Animation(TabNameLabel,Tween,{
@@ -7150,12 +8209,6 @@ function Compkiller.new(Config : Window)
 			local UICorner_2 = Instance.new("UICorner")
 			local TextLabel_2 = Instance.new("TextLabel")
 			local Icon_2 = Instance.new("ImageLabel")
-			local AutoButton = Instance.new("Frame")
-			local AutoFrame = Instance.new("Frame")
-			local AutoStroke = Instance.new("UIStroke")
-			local AutoCorner = Instance.new("UICorner")
-			local AutoText = Instance.new("TextLabel")
-			local AutoIcon = Instance.new("ImageLabel")
 			local UIStroke_3 = Instance.new("UIStroke")
 			local UICorner_3 = Instance.new("UICorner")
 			local AuthorText = Instance.new("TextLabel")
@@ -7171,7 +8224,7 @@ function Compkiller.new(Config : Window)
 			DelButton.LayoutOrder = -9999
 			DelButton.Size = UDim2.new(0, 35, 0, 15)
 			DelButton.ZIndex = 14
-			DelButton.Image = "rbxassetid://10747362393"
+			DelButton.Image = Compkiller:CacheImage("rbxassetid://10747362393")
 			DelButton.ImageColor3 = Color3.fromRGB(255, 107, 107)
 			DelButton.ImageTransparency = 0.500
 			DelButton.ScaleType = Enum.ScaleType.Fit
@@ -7222,9 +8275,8 @@ function Compkiller.new(Config : Window)
 			LinkValues.BackgroundTransparency = 1.000
 			LinkValues.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			LinkValues.BorderSizePixel = 0
-			LinkValues.Position = UDim2.new(1, -5, 0.5, 15)
-			LinkValues.Size = UDim2.new(0, 0, 0, 18)
-			LinkValues.AutomaticSize = Enum.AutomaticSize.X
+			LinkValues.Position = UDim2.new(1, -12, 0.5, 15)
+			LinkValues.Size = UDim2.new(1, 0, 0, 18)
 			LinkValues.ZIndex = 11
 
 			UIListLayout.Parent = LinkValues
@@ -7232,7 +8284,7 @@ function Compkiller.new(Config : Window)
 			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 			UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-			UIListLayout.Padding = UDim.new(0, 3)
+			UIListLayout.Padding = UDim.new(0, -10)
 
 			SaveButton.Name = Compkiller:_RandomString()
 			SaveButton.Parent = LinkValues
@@ -7241,7 +8293,6 @@ function Compkiller.new(Config : Window)
 			SaveButton.BorderSizePixel = 0
 			SaveButton.Size = UDim2.new(0, 77, 0, 30)
 			SaveButton.ZIndex = 14
-			SaveButton.LayoutOrder = -2
 
 			Frame.Parent = SaveButton
 			Frame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -7301,7 +8352,7 @@ function Compkiller.new(Config : Window)
 			Icon.Size = UDim2.new(0.699999988, 0, 0.699999988, 0)
 			Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
 			Icon.ZIndex = 15
-			Icon.Image = "rbxassetid://10734941499"
+			Icon.Image = Compkiller:CacheImage("rbxassetid://10734941499")
 			Icon.ImageTransparency = 1;
 
 			LoadButton.Name = Compkiller:_RandomString()
@@ -7370,104 +8421,8 @@ function Compkiller.new(Config : Window)
 			Icon_2.Size = UDim2.new(0.699999988, 0, 0.699999988, 0)
 			Icon_2.SizeConstraint = Enum.SizeConstraint.RelativeYY
 			Icon_2.ZIndex = 15
-			Icon_2.Image = "rbxassetid://10723344270"
+			Icon_2.Image = Compkiller:CacheImage("rbxassetid://10723344270")
 			Icon_2.ImageTransparency = 1
-
-			-- Auto Load Button
-			AutoButton.Name = Compkiller:_RandomString()
-			AutoButton.Parent = LinkValues
-			AutoButton.BackgroundTransparency = 1.000
-			AutoButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			AutoButton.BorderSizePixel = 0
-			AutoButton.Size = UDim2.new(0, 77, 0, 30)
-			AutoButton.ZIndex = 14
-			AutoButton.LayoutOrder = -1
-
-			AutoFrame.Parent = AutoButton
-			AutoFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-			AutoFrame.BackgroundColor3 = Compkiller.Colors.Highlight
-			AutoFrame.BackgroundTransparency = 1
-			AutoFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			AutoFrame.BorderSizePixel = 0
-			AutoFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-			AutoFrame.Size = UDim2.new(1, -15, 1, -5)
-			AutoFrame.ZIndex = 14
-
-			-- register for theme updates and default state
-			AutoFrame:SetAttribute('AutoState', false)
-			table.insert(Compkiller.Elements.AutoButtons , {
-				Element = AutoFrame,
-				Property = 'BackgroundColor3'
-			});
-
-			AutoStroke.Transparency = 1
-			AutoStroke.Color = Compkiller.Colors.StrokeColor
-			AutoStroke.Parent = AutoFrame
-
-			table.insert(Compkiller.Elements.StrokeColor,{
-				Element = AutoStroke,
-				Property = "Color"
-			});
-
-			AutoCorner.CornerRadius = UDim.new(0, 3)
-			AutoCorner.Parent = AutoFrame
-
-			AutoText.Parent = AutoFrame
-			AutoText.AnchorPoint = Vector2.new(0.5, 0.5)
-			AutoText.BackgroundTransparency = 1.000
-			AutoText.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			AutoText.BorderSizePixel = 0
-			AutoText.Position = UDim2.new(0.5, 27, 0.5, 0)
-			AutoText.Size = UDim2.new(1, 0, 1, 0)
-			AutoText.ZIndex = 14
-			AutoText.Font = Enum.Font.GothamMedium
-			AutoText.Text = "Auto"
-			AutoText.TextColor3 = Compkiller.Colors.SwitchColor
-			AutoText.TextSize = 12.000
-			AutoText.TextStrokeTransparency = 1
-			AutoText.TextXAlignment = Enum.TextXAlignment.Left
-			AutoText.TextTransparency = 1
-
-			table.insert(Compkiller.Elements.SwitchColor , {
-				Element = AutoText,
-				Property = 'TextColor3'
-			});
-
-			AutoIcon.Name = Compkiller:_RandomString()
-			AutoIcon.Parent = AutoFrame
-			AutoIcon.AnchorPoint = Vector2.new(0, 0.5)
-			AutoIcon.BackgroundTransparency = 1.000
-			AutoIcon.BorderColor3 = Color3.fromRGB(0, 0, 0)
-			AutoIcon.BorderSizePixel = 0
-			AutoIcon.Position = UDim2.new(0, 5, 0.5, 0)
-			AutoIcon.Size = UDim2.new(0.699999988, 0, 0.699999988, 0)
-			AutoIcon.SizeConstraint = Enum.SizeConstraint.RelativeYY
-			AutoIcon.ZIndex = 15
-			AutoIcon.Image = "rbxassetid://10734941499"
-			AutoIcon.ImageTransparency = 1
-
-			-- Tick indicator shown when auto-load is enabled (before config name)
-			local AutoTick = Instance.new("TextLabel")
-			AutoTick.Name = Compkiller:_RandomString()
-			AutoTick.Parent = ConfigBlock
-			AutoTick.AnchorPoint = Vector2.new(0, 0.5)
-			AutoTick.BackgroundTransparency = 1
-			AutoTick.BorderSizePixel = 0
-			AutoTick.Position = UDim2.new(0, -2, 0.5, 15)
-			AutoTick.Size = UDim2.new(0, 18, 0, 18)
-			AutoTick.ZIndex = 12
-			AutoTick.Font = Enum.Font.GothamMedium
-			AutoTick.Text = "✓"
-			AutoTick.TextSize = 14
-			AutoTick.TextColor3 = Compkiller.Colors.SwitchColor
-			AutoTick.TextXAlignment = Enum.TextXAlignment.Center
-			AutoTick.TextYAlignment = Enum.TextYAlignment.Center
-			AutoTick.Visible = false
-
-			table.insert(Compkiller.Elements.SwitchColor , {
-				Element = AutoTick,
-				Property = 'TextColor3'
-			});
 			UIStroke_3.Transparency = 1
 
 			UIStroke_3.Color = Compkiller.Colors.StrokeColor
@@ -7491,21 +8446,22 @@ function Compkiller.new(Config : Window)
 			AuthorText.Size = UDim2.new(1, -20, 0, 25)
 			AuthorText.ZIndex = 10
 			AuthorText.Font = Enum.Font.GothamMedium
-			AuthorText.RichText = false;
-			AuthorText.Text = ""
+			AuthorText.RichText = true;
+			AuthorText.Text = "Author: <font color=\"rgb(17, 238, 253)\">NoFi</font>"
 			AuthorText.TextColor3 = Compkiller.Colors.SwitchColor
 			AuthorText.TextSize = 13.000
 			AuthorText.TextTransparency = 1
 			AuthorText.TextXAlignment = Enum.TextXAlignment.Left
-			AuthorText.Visible = false
 
 			table.insert(Compkiller.Elements.SwitchColor , {
-				Element = AuthorText,
+				Element = TabNameLabel,
 				Property = 'TextColor3'
 			});
 
 			function ConfigButton:SetInfo(Author , ConfigName)
-				-- Author hidden per design
+				local R,G,B = tostring(math.floor(Compkiller.Colors.Highlight.R * 255)) , tostring(math.floor(Compkiller.Colors.Highlight.G * 255)) , tostring(math.floor(Compkiller.Colors.Highlight.B * 255));
+
+				AuthorText.Text = string.format("Author: <font color=\"rgb(%s, %s, %s)\">%s</font>" ,R,G,B , tostring(Author));
 				ConfigText.Text = ConfigName;
 
 				if ConfigBlock.BackgroundTransparency >= 0.7 then
@@ -7566,23 +8522,6 @@ function Compkiller.new(Config : Window)
 						TextStrokeTransparency = 0.900,
 						TextTransparency = 0
 					});
-
-					Compkiller:_Animation(AutoFrame,Tween,{
-						BackgroundTransparency = 0.100
-					});
-
-					Compkiller:_Animation(AutoStroke,Tween,{
-						Transparency = 0
-					});
-
-					Compkiller:_Animation(AutoText,Tween,{
-						TextStrokeTransparency = 0.900,
-						TextTransparency = 0
-					});
-
-					Compkiller:_Animation(AutoIcon,Tween,{
-						ImageTransparency = 0
-					});
 				else
 					Compkiller:_Animation(AuthorText,Tween,{
 						TextTransparency = 1,
@@ -7635,23 +8574,6 @@ function Compkiller.new(Config : Window)
 						TextStrokeTransparency = 1,
 						TextTransparency = 1
 					});
-
-					Compkiller:_Animation(AutoFrame,Tween,{
-						BackgroundTransparency = 1
-					});
-
-					Compkiller:_Animation(AutoStroke,Tween,{
-						Transparency = 1
-					});
-
-					Compkiller:_Animation(AutoText,Tween,{
-						TextStrokeTransparency = 1,
-						TextTransparency = 1
-					});
-
-					Compkiller:_Animation(AutoIcon,Tween,{
-						ImageTransparency = 1
-					});
 				end;
 			end;
 
@@ -7661,22 +8583,6 @@ function Compkiller.new(Config : Window)
 				AuthorText:SetAttribute('SPC',math.clamp(nameScale.X + 20 , 100,150));
 
 				AuthorText.Position = UDim2.new(0, AuthorText:GetAttribute('SPC'), 0.5, 15)
-			end;
-
-			-- Auto state helpers
-			local _autoEnabled = false;
-
-			function ConfigButton:UpdateAutoVisual()
-				-- Keep button background constant; show tick when enabled
-				AutoFrame.BackgroundColor3 = Compkiller.Colors.Highlight;
-				AutoFrame:SetAttribute('AutoState', _autoEnabled);
-				AutoText.Text = "Auto";
-				AutoTick.Visible = _autoEnabled and true or false;
-			end;
-
-			function ConfigButton:SetAutoState(on)
-				_autoEnabled = on and true or false;
-				ConfigButton:UpdateAutoVisual();
 			end;
 
 			ConfigButton:Update();
@@ -7689,10 +8595,6 @@ function Compkiller.new(Config : Window)
 				task.spawn(ConfigButton.OnSave);
 			end);
 
-			Compkiller:_Input(AutoButton,function()
-				task.spawn(ConfigButton.OnAutoToggle);
-			end);
-
 			DelButton.MouseButton1Click:Connect(function()
 				task.spawn(ConfigButton.OnDelete);
 			end)
@@ -7700,7 +8602,6 @@ function Compkiller.new(Config : Window)
 			ConfigButton.OnLoad = nil;
 			ConfigButton.OnSave = nil;
 			ConfigButton.OnDelete = nil;
-			ConfigButton.OnAutoToggle = nil;
 
 			return ConfigButton;
 		end;
@@ -7741,7 +8642,6 @@ function Compkiller.new(Config : Window)
 					local Button = TabArgs:_DrawConfig();
 
 					Button:SetInfo(v.Info.Author,v.Name);
-					Button:SetAutoState(Configuration.Config:GetAutoLoad(v.Name));
 
 					table.insert(__signals,TabOpenSignal:Connect(function(v)
 						Button:Toggle(v);
@@ -7750,7 +8650,7 @@ function Compkiller.new(Config : Window)
 					Button.OnLoad = function()
 						WindowArgs.Notify.new({
 							Title = "Configs",
-							Icon = Compkiller:_GetIcon(Config.Logo),
+							Icon = Compkiller:CacheImage(Config.Logo),
 							Content = "Load config \""..v.Name.."\""
 						})
 
@@ -7760,7 +8660,7 @@ function Compkiller.new(Config : Window)
 					Button.OnSave = function()
 						WindowArgs.Notify.new({
 							Title = "Configs",
-							Icon = Compkiller:_GetIcon(Config.Logo),
+							Icon = Compkiller:CacheImage(Config.Logo),
 							Content = "Save config \""..v.Name.."\""
 						})
 
@@ -7775,22 +8675,11 @@ function Compkiller.new(Config : Window)
 					Button.OnDelete = function()
 						WindowArgs.Notify.new({
 							Title = "Configs",
-							Icon = Compkiller:_GetIcon(Config.Logo),
+							Icon = Compkiller:CacheImage(Config.Logo),
 							Content = "Delete config \""..v.Name.."\""
 						})
 
 						Configuration.Config:DeleteConfig(v.Name)
-					end
-
-					Button.OnAutoToggle = function()
-						local newState = not Configuration.Config:GetAutoLoad(v.Name);
-						Configuration.Config:SetSingleAutoLoad(v.Name, newState);
-						WindowArgs.Notify.new({
-							Title = "Configs",
-							Icon = Compkiller:_GetIcon(Config.Logo),
-							Content = (newState and "Enabled" or "Disabled") .. " Auto Load for \""..v.Name.."\""
-						})
-						Refresh();
 					end
 				end;
 			end;
@@ -7857,278 +8746,252 @@ function Compkiller.new(Config : Window)
 			Left.ClipsDescendants = false
 			Left.Position = UDim2.new(0.25, -3, 0.5, 0)
 			Left.Size = UDim2.new(0.5, -3, 1, 0)
+			Left.ZIndex = 8
+			Left.BottomImage = ""
+			Left.ScrollBarThickness = 0
+			Left.TopImage = ""
+			--Left.AutomaticCanvasSize = Enum.AutomaticSize.Y;
+			Left.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-        UIListLayout.Parent = Left
-        UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        UIListLayout.VerticalFlex = Enum.UIFlexAlignment.None
-        UIListLayout.Padding = UDim.new(0, BASE_PADDING)
+			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+				Left.CanvasSize = UDim2.fromOffset(0,UIListLayout.AbsoluteContentSize.Y)
+			end)
 
-        Right.Name = Compkiller:_RandomString()
-        Right.Parent = TabContent
-        Right.Active = true
-        Right.AnchorPoint = Vector2.new(0.5, 0.5)
-        Right.BackgroundTransparency = 1.000
-        Right.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        Right.BorderSizePixel = 0
-        Right.ClipsDescendants = false
-        Right.Position = UDim2.new(0.75, 3, 0.5, 0)
-        Right.Size = UDim2.new(0.5, -3, 1, 0)
-        Right.ZIndex = 8
-        Right.BottomImage = ""
-        Right.ScrollBarThickness = 0
-        Right.TopImage = ""
-        --Right.AutomaticCanvasSize = Enum.AutomaticSize.Y;
-        Right.CanvasSize = UDim2.new(0, 0, 0, 0)
+			UIListLayout.Parent = Left
+			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout.VerticalFlex = Enum.UIFlexAlignment.None
+			UIListLayout.Padding = UDim.new(0, BASE_PADDING)
 
-        Upvalue.Left = Left;
-        Upvalue.Right = Right;
-        Upvalue.LeftLayout = UIListLayout;
-        Upvalue.RightLayout = UIListLayout_2;
+			Right.Name = Compkiller:_RandomString()
+			Right.Parent = TabContent
+			Right.Active = true
+			Right.AnchorPoint = Vector2.new(0.5, 0.5)
+			Right.BackgroundTransparency = 1.000
+			Right.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Right.BorderSizePixel = 0
+			Right.ClipsDescendants = false
+			Right.Position = UDim2.new(0.75, 3, 0.5, 0)
+			Right.Size = UDim2.new(0.5, -3, 1, 0)
+			Right.ZIndex = 8
+			Right.BottomImage = ""
+			--Right.AutomaticCanvasSize = Enum.AutomaticSize.Y;
+			Right.CanvasSize = UDim2.new(0, 0, 0, 0)
+			Right.ScrollBarThickness = 0
+			Right.TopImage = ""
 
-        UIListLayout_2:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-            local count = 0
-            for _,c in next, Right:GetChildren() do
-                if c:IsA('Frame') and c:FindFirstChildWhichIsA('UIListLayout') then count += 1 end
-            end
-            Right.ScrollingEnabled = (count == 1)
-            if Right.ScrollingEnabled then
-                Right.CanvasSize = UDim2.fromOffset(0, UIListLayout_2.AbsoluteContentSize.Y)
-            else
-                Right.CanvasSize = UDim2.fromOffset(0, 0)
-            end
-        end)
+			Upvalue.Left = Left;
+			Upvalue.Right = Right;
+			Upvalue.LeftLayout = UIListLayout;
+			Upvalue.RightLayout = UIListLayout_2;
 
-        -- Re-evaluate when sections change
-        -- Fix for "Fire is not a valid member of RBXScriptSignal"
-        -- Instead of trying to call :Fire(), we should perform layout refreshes directly
+			UIListLayout_2:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+				Right.CanvasSize = UDim2.fromOffset(0,UIListLayout_2.AbsoluteContentSize.Y)
+			end)
 
-        local function refreshLeftLayout()
-            -- The property changes automatically, but to force a recalculation we can re-parent or reset size (commonly used hack)
-            -- For UIListLayout, most property change signals fire automatically, but some use:
-            -- Optionally, if you have a manual function to update layout, call it here instead.
-            -- Otherwise, forcing updates:
-            if Left and UIListLayout then
-                -- Sometimes setting Size does the trick
-                Left.Size = Left.Size + UDim2.new(0,0,0,0)
-            end
-        end
+			UIListLayout_2.Parent = Right
+			UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout_2.Padding = UDim.new(0, BASE_PADDING)
+			UIListLayout_2.VerticalFlex = Enum.UIFlexAlignment.None
 
-        local function refreshRightLayout()
-            if Right and UIListLayout_2 then
-                Right.Size = Right.Size + UDim2.new(0,0,0,0)
-            end
-        end
+			WindowArgs:AddUnbind(UIListLayout_2 , Right);
+			WindowArgs:AddUnbind(UIListLayout , Left);
 
-        Left.ChildAdded:Connect(function(obj)
-            task.defer(refreshLeftLayout)
-        end)
-        Left.ChildRemoved:Connect(function(obj)
-            task.defer(refreshLeftLayout)
-        end)
-        Right.ChildAdded:Connect(function(obj)
-            task.defer(refreshRightLayout)
-        end)
-        Right.ChildRemoved:Connect(function(obj)
-            task.defer(refreshRightLayout)
-        end)
+			if TabConfig.Type == "Single" then
+				Right.Visible = false;
+				Left.Position = UDim2.new(0.5, 0, 0.5, 0)
+				Left.Size = UDim2.new(1,0,1,0)
+			end;
 
-        UIListLayout_2.Parent = Right
-        UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
-        UIListLayout_2.Padding = UDim.new(0, BASE_PADDING)
-        UIListLayout_2.VerticalFlex = Enum.UIFlexAlignment.None
+			local Tween = TweenInfo.new(0.35,Enum.EasingStyle.Quint);
 
-        WindowArgs:AddUnbind(UIListLayout_2 , Right);
-        WindowArgs:AddUnbind(UIListLayout , Left);
+			Internal.Highlight:GetPropertyChangedSignal('BackgroundTransparency'):Connect(function()
+				if Internal.Highlight.BackgroundTransparency <= 0.99 then
+					TabContent.Visible = true;
+				else
+					TabContent.Visible = false;
+				end;
 
-        if TabConfig.Type == "Single" then
-            Right.Visible = false;
-            Left.Position = UDim2.new(0.5, 0, 0.5, 0)
-            Left.Size = UDim2.new(1,0,1,0)
-        end;
+				if Compkiller.PerformanceMode then
+					if TabContent.Visible then
+						Compkiller:_SetNilP(TabContent , Internal.Parent);
+					else
+						Compkiller:_SetNilP(TabContent , nil);
+					end;
+				else
+					Compkiller:_SetNilP(TabContent , Internal.Parent);
+				end;
+			end);
 
-        local Tween = TweenInfo.new(0.35,Enum.EasingStyle.Quint);
+			Upvalue.Left = Left;
+			Upvalue.Right = Right;
 
-        Internal.Highlight:GetPropertyChangedSignal('BackgroundTransparency'):Connect(function()
-            if Internal.Highlight.BackgroundTransparency <= 0.99 then
-                TabContent.Visible = true;
-            else
-                TabContent.Visible = false;
-            end;
-        end);
+			if Compkiller:_IsMobile() then
+				Compkiller:_AddDragBlacklist(Left);
+				Compkiller:_AddDragBlacklist(Right);
+			end;
 
-        Upvalue.Left = Left;
-        Upvalue.Right = Right;
+			TabOpenSignal = Internal.Signal;
 
-        if Compkiller:_IsMobile() then
-            Compkiller:_AddDragBlacklist(Left);
-            Compkiller:_AddDragBlacklist(Right);
-        end;
+			if not TabOpenSignal:GetValue() then
+				TabContent.Visible = false;
+			else
+				TabContent.Visible = true;
+			end;
 
-        TabOpenSignal = Internal.Signal;
+			if Compkiller.PerformanceMode then
+				if TabContent.Visible then
+					Compkiller:_SetNilP(TabContent , Internal.Parent);
+				else
+					Compkiller:_SetNilP(TabContent , nil);
+				end;
+			else
+				Compkiller:_SetNilP(TabContent , Internal.Parent);
+			end;
+		else
+			-- Button --
+			local TabButton = Instance.new("Frame")
+			local Icon = Instance.new("ImageLabel")
+			local TabNameLabel = Instance.new("TextLabel")
+			local Highlight = Instance.new("Frame")
+			local UICorner = Instance.new("UICorner")
 
-        if not TabOpenSignal:GetValue() then
-            TabContent.Visible = false;
-        else
-            TabContent.Visible = true;
-        end;
-    else
-        -- Button --
-        local TabButton = Instance.new("Frame")
-        local Icon = Instance.new("ImageLabel")
-        local TabNameLabel = Instance.new("TextLabel")
-        local Highlight = Instance.new("Frame")
-        local UICorner = Instance.new("UICorner")
+			TabButton.Name = Compkiller:_RandomString()
+			TabButton.Parent = TabButtonScrollingFrame
+			TabButton.BackgroundTransparency = 1.000
+			TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			TabButton.BorderSizePixel = 0
+			TabButton.ClipsDescendants = true
+			TabButton.Size = UDim2.new(1, -10, 0, 32)
+			TabButton.ZIndex = 3
 
-        TabButton.Name = Compkiller:_RandomString()
-        TabButton.Parent = TabButtonScrollingFrame
-        TabButton.BackgroundTransparency = 1.000
-        TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        TabButton.BorderSizePixel = 0
-        TabButton.ClipsDescendants = true
-        TabButton.Size = UDim2.new(1, -10, 0, 32)
-        TabButton.ZIndex = 3
+			Icon.Name = Compkiller:_RandomString()
+			Icon.Parent = TabButton
+			Icon.AnchorPoint = Vector2.new(0, 0.5)
+			Icon.BackgroundColor3 = Compkiller.Colors.Highlight
+			Icon.BackgroundTransparency = 1.000
+			Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Icon.BorderSizePixel = 0
+			Icon.Position = UDim2.new(0, 15, 0.5, 0)
+			Icon.Size = UDim2.new(0, 15, 0, 15)
+			Icon.ZIndex = 3
+			Icon.Image = Compkiller:_GetIcon(TabConfig.Icon);
+			Icon.ImageColor3 = Compkiller.Colors.Highlight
 
-        Icon.Name = Compkiller:_RandomString()
-        Icon.Parent = TabButton
-        Icon.AnchorPoint = Vector2.new(0, 0.5)
-        Icon.BackgroundColor3 = Compkiller.Colors.Highlight
-        Icon.BackgroundTransparency = 1.000
-        Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        Icon.BorderSizePixel = 0
-        Icon.Position = UDim2.new(0, 15, 0.5, 0)
-        Icon.Size = UDim2.new(0, 22, 0, 22)
-        Icon.ZIndex = 3
-        Icon.Image = Compkiller:_GetIcon(TabConfig.Icon);
-        Icon.ImageColor3 = Compkiller.Colors.Highlight
+			table.insert(Compkiller.Elements.Highlight,{
+				Element = Icon,
+				Property = "ImageColor3"
+			});
 
-        table.insert(Compkiller.Elements.Highlight,{
-            Element = Icon,
-            Property = "ImageColor3"
-        });
+			TabNameLabel.Name = Compkiller:_RandomString()
+			TabNameLabel.Parent = TabButton
+			TabNameLabel.AnchorPoint = Vector2.new(0, 0.5)
+			TabNameLabel.BackgroundTransparency = 1.000
+			TabNameLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			TabNameLabel.BorderSizePixel = 0
+			TabNameLabel.Position = UDim2.new(0, 43, 0.5, 0)
+			TabNameLabel.Size = UDim2.new(0, 200, 0, 25)
+			TabNameLabel.ZIndex = 3
+			TabNameLabel.Font = Enum.Font.GothamMedium
+			TabNameLabel.Text = TabConfig.Name;
+			TabNameLabel.TextColor3 = Compkiller.Colors.SwitchColor
+			TabNameLabel.TextSize = 15.000
+			TabNameLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-        TabNameLabel.Name = Compkiller:_RandomString()
-        TabNameLabel.Parent = TabButton
-        TabNameLabel.AnchorPoint = Vector2.new(0, 0.5)
-        TabNameLabel.BackgroundTransparency = 1.000
-        TabNameLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        TabNameLabel.BorderSizePixel = 0
-        TabNameLabel.Position = UDim2.new(0, 43, 0.5, 0)
-        TabNameLabel.Size = UDim2.new(0, 200, 0, 25)
-        TabNameLabel.ZIndex = 3
-        TabNameLabel.Font = Enum.Font.GothamMedium
-        TabNameLabel.Text = TabConfig.Name;
-        TabNameLabel.TextColor3 = Compkiller.Colors.SwitchColor
-        TabNameLabel.TextSize = 15.000
-        TabNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+			table.insert(Compkiller.Elements.SwitchColor , {
+				Element = TabNameLabel,
+				Property = 'TextColor3'
+			});
 
-        table.insert(Compkiller.Elements.SwitchColor , {
-            Element = TabNameLabel,
-            Property = 'TextColor3'
-        });
+			Highlight.Name = Compkiller:_RandomString()
+			Highlight.Parent = TabButton
+			Highlight.AnchorPoint = Vector2.new(0.5, 0.5)
+			Highlight.BackgroundColor3 = Color3.fromRGB(161, 161, 161)
+			Highlight.BackgroundTransparency = 0.925
+			Highlight.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Highlight.BorderSizePixel = 0
+			Highlight.Position = UDim2.new(0.5, 0, 0.5, 0)
+			Highlight.Size = UDim2.new(1, -17, 1, 0)
+			Highlight.ZIndex = 2
 
-        Highlight.Name = Compkiller:_RandomString()
-        Highlight.Parent = TabButton
-        Highlight.AnchorPoint = Vector2.new(0.5, 0.5)
-        Highlight.BackgroundColor3 = Color3.fromRGB(161, 161, 161)
-        Highlight.BackgroundTransparency = 0.925
-        Highlight.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        Highlight.BorderSizePixel = 0
-        Highlight.Position = UDim2.new(0.5, 0, 0.5, 0)
-        Highlight.Size = UDim2.new(1, -17, 1, 0)
-        Highlight.ZIndex = 2
+			UICorner.CornerRadius = UDim.new(0, 4)
+			UICorner.Parent = Highlight
 
-        UICorner.CornerRadius = UDim.new(0, 4)
-        UICorner.Parent = Highlight
+			local TabContent = Instance.new("Frame")
+			local Left = Instance.new("ScrollingFrame")
+			local UIListLayout = Instance.new("UIListLayout")
+			local Right = Instance.new("ScrollingFrame")
+			local UIListLayout_2 = Instance.new("UIListLayout")
 
-        local TabContent = Instance.new("Frame")
-        local Left = Instance.new("ScrollingFrame")
-        local UIListLayout = Instance.new("UIListLayout")
-        local Right = Instance.new("ScrollingFrame")
-        local UIListLayout_2 = Instance.new("UIListLayout")
+			TabContent.Name = Compkiller:_RandomString()
+			TabContent.Parent = TabMainFrame;
+			TabContent.AnchorPoint = Vector2.new(0.5, 0.5)
+			TabContent.BackgroundTransparency = 1.000
+			TabContent.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			TabContent.BorderSizePixel = 0
+			TabContent.Position = UDim2.new(0.5, 0, 0.5, 0)
+			TabContent.Size = UDim2.new(1, -15, 1, -15)
+			TabContent.ZIndex = 6
 
-        TabContent.Name = Compkiller:_RandomString()
-        TabContent.Parent = TabMainFrame;
-        TabContent.AnchorPoint = Vector2.new(0.5, 0.5)
-        TabContent.BackgroundTransparency = 1.000
-        TabContent.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        TabContent.BorderSizePixel = 0
-        TabContent.Position = UDim2.new(0.5, 0, 0.5, 0)
-        TabContent.Size = UDim2.new(1, -15, 1, -15)
-        TabContent.ZIndex = 6
+			Left.Name = Compkiller:_RandomString()
+			Left.Parent = TabContent
+			Left.Active = true
+			Left.AnchorPoint = Vector2.new(0.5, 0.5)
+			Left.BackgroundTransparency = 1.000
+			Left.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Left.BorderSizePixel = 0
+			Left.ClipsDescendants = false
+			Left.Position = UDim2.new(0.25, -3, 0.5, 0)
+			Left.Size = UDim2.new(0.5, -3, 1, 0)
+			Left.ZIndex = 8
+			Left.BottomImage = ""
+			Left.ScrollBarThickness = 0
+			Left.TopImage = ""
+			--Left.AutomaticCanvasSize = Enum.AutomaticSize.Y;
+			Left.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-        Left.Name = Compkiller:_RandomString()
-        Left.Parent = TabContent
-        Left.Active = true
-        Left.AnchorPoint = Vector2.new(0.5, 0.5)
-        Left.BackgroundTransparency = 1.000
-        Left.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        Left.BorderSizePixel = 0
-        Left.ClipsDescendants = false
-        Left.Position = UDim2.new(0.25, -3, 0.5, 0)
-        Left.Size = UDim2.new(0.5, -3, 1, 0)
-        Left.ZIndex = 8
-        Left.BottomImage = ""
-        Left.ScrollBarThickness = 0
-        Left.TopImage = ""
-        --Left.AutomaticCanvasSize = Enum.AutomaticSize.Y;
-        Left.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-        local function RecalcLeft()
-            local count = 0
-            for _,c in next, Left:GetChildren() do
-                if c:IsA('Frame') and c:FindFirstChildWhichIsA('UIListLayout') then
-                    count += 1
-                end
-            end
-            Left.ScrollingEnabled = (count == 1)
-            if Left.ScrollingEnabled then
-                Left.CanvasSize = UDim2.fromOffset(0, UIListLayout.AbsoluteContentSize.Y)
-            else
-                Left.CanvasSize = UDim2.fromOffset(0, 0)
-            end
-        end
+			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+				Left.CanvasSize = UDim2.fromOffset(0,UIListLayout.AbsoluteContentSize.Y)
+			end);
 
-        UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(RecalcLeft);
+			UIListLayout.Parent = Left
+			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout.VerticalFlex = Enum.UIFlexAlignment.None
+			UIListLayout.Padding = UDim.new(0, BASE_PADDING)
 
-        Left:GetPropertyChangedSignal('Size'):Connect(RecalcLeft)
-        Left:GetPropertyChangedSignal('AbsoluteSize'):Connect(RecalcLeft)
+			Right.Name = Compkiller:_RandomString()
+			Right.Parent = TabContent
+			Right.Active = true
+			Right.AnchorPoint = Vector2.new(0.5, 0.5)
+			Right.BackgroundTransparency = 1.000
+			Right.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Right.BorderSizePixel = 0
+			Right.ClipsDescendants = false
+			Right.Position = UDim2.new(0.75, 3, 0.5, 0)
+			Right.Size = UDim2.new(0.5, -3, 1, 0)
+			Right.ZIndex = 8
+			Right.BottomImage = ""
+			Right.ScrollBarThickness = 0
+			Right.TopImage = ""
+			--Right.AutomaticCanvasSize = Enum.AutomaticSize.Y;
+			Right.CanvasSize = UDim2.new(0, 0, 0, 0)
 
-        Left.ChildAdded:Connect(RecalcLeft)
-        Left.ChildRemoved:Connect(RecalcLeft)
+			Upvalue.Left = Left;
+			Upvalue.Right = Right;
+			Upvalue.LeftLayout = UIListLayout;
+			Upvalue.RightLayout = UIListLayout_2;
 
-        UIListLayout.Parent = Left
-        UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        UIListLayout.VerticalFlex = Enum.UIFlexAlignment.None
-        UIListLayout.Padding = UDim.new(0, BASE_PADDING)
+			UIListLayout_2:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+				Right.CanvasSize = UDim2.fromOffset(0,UIListLayout_2.AbsoluteContentSize.Y)
+			end)
 
-        Right.Name = Compkiller:_RandomString()
-        Right.Parent = TabContent
-        Right.Active = true
-        Right.AnchorPoint = Vector2.new(0.5, 0.5)
-        Right.BackgroundTransparency = 1.000
-        Right.BorderColor3 = Color3.fromRGB(0, 0, 0)
-        Right.BorderSizePixel = 0
-        Right.ClipsDescendants = false
-        Right.Position = UDim2.new(0.75, 3, 0.5, 0)
-        Right.Size = UDim2.new(0.5, -3, 1, 0)
-        Right.ZIndex = 8
-        Right.BottomImage = ""
-        Right.ScrollBarThickness = 0
-        Right.TopImage = ""
-        --Right.AutomaticCanvasSize = Enum.AutomaticSize.Y;
-        Right.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-        Upvalue.Left = Left;
-        Upvalue.Right = Right;
-        Upvalue.LeftLayout = UIListLayout;
-        Upvalue.RightLayout = UIListLayout_2;
-        UIListLayout_2.VerticalFlex = Enum.UIFlexAlignment.None
-
-        WindowArgs:AddUnbind(UIListLayout_2 , Right);
-        WindowArgs:AddUnbind(UIListLayout , Left);
+			UIListLayout_2.Parent = Right
+			UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout_2.Padding = UDim.new(0, BASE_PADDING)
 			UIListLayout_2.VerticalFlex = Enum.UIFlexAlignment.None
 
 			WindowArgs:AddUnbind(UIListLayout_2 , Right);
@@ -8152,6 +9015,16 @@ function Compkiller.new(Config : Window)
 					TabContent.Visible = true;
 				else
 					TabContent.Visible = false;
+				end;
+
+				if Compkiller.PerformanceMode then
+					if TabContent.Visible then
+						Compkiller:_SetNilP(TabContent , TabMainFrame);
+					else
+						Compkiller:_SetNilP(TabContent , nil);
+					end;
+				else
+					Compkiller:_SetNilP(TabContent , TabMainFrame);
 				end;
 			end)
 
@@ -8229,8 +9102,7 @@ function Compkiller.new(Config : Window)
 					});
 
 					Compkiller:_Animation(Icon,Tween,{
-						Position = UDim2.new(0, 15, 0.5, 0),
-						Size = UDim2.new(0, 22, 0, 22),
+						Size = UDim2.new(0, 16, 0, 16),
 					});
 
 					Compkiller:_Animation(TabNameLabel,Tween,{
@@ -8256,8 +9128,7 @@ function Compkiller.new(Config : Window)
 					});
 
 					Compkiller:_Animation(Icon,Tween,{
-						Position = UDim2.new(0, 12, 0.5, 0),
-						Size = UDim2.new(0, 20, 0, 20),
+						Size = UDim2.new(0, 16, 0, 16),
 					});
 
 					Compkiller:_Animation(TabNameLabel,Tween,{
@@ -8459,7 +9330,7 @@ function Compkiller.new(Config : Window)
 			SectionClose.Position = UDim2.new(1, -12, 0.5, 0)
 			SectionClose.Size = UDim2.new(0, 17, 0, 17)
 			SectionClose.ZIndex = 10
-			SectionClose.Image = "rbxassetid://10709790948"
+			SectionClose.Image = Compkiller:CacheImage("rbxassetid://109535175596957")
 			SectionClose.ImageTransparency = 0.500
 
 			if not SectionText.Text:byte() then
@@ -8482,7 +9353,10 @@ function Compkiller.new(Config : Window)
 				Section:SetAttribute('OrigninalScale',UIListLayout.AbsoluteContentSize.Y);
 
 				if IsOpen then
-					if Section:GetAttribute('Height') then
+					local FullScale = Section.AbsolutePosition.Y + UIListLayout.AbsoluteContentSize.Y;
+					local RefPos = Parent.AbsolutePosition.Y + Parent.AbsoluteSize.Y;
+
+					if (Section:GetAttribute('Height') and not Compkiller:_IsMobile() and FullScale <= RefPos) then
 						Compkiller:_Animation(Section,TweenInfo.new(0.4,Enum.EasingStyle.Quint),{
 							Size = UDim2.new(1, 0, 0, math.abs(Section:GetAttribute('Height')) + 5)
 						});
@@ -8490,6 +9364,10 @@ function Compkiller.new(Config : Window)
 						Compkiller:_Animation(Section,TweenInfo.new(0.4,Enum.EasingStyle.Quint),{
 							Size = UDim2.new(1, 0, 0, math.abs(UIListLayout.AbsoluteContentSize.Y) - 1)
 						});
+
+						if Section:GetAttribute('Lasth') and UIListLayout.AbsoluteContentSize.Y > Section:GetAttribute('Lasth') then
+							Section:SetAttribute('Lasth',math.abs(UIListLayout.AbsoluteContentSize.Y) - 1);
+						end;
 					end;
 
 					TabArgs.SectionClose[Parent][Section] = nil;
@@ -8534,7 +9412,7 @@ function Compkiller.new(Config : Window)
 
 				if Latest >= frameFound then
 					local lscale = 25;
-					
+
 					if allscale >= (Parent.AbsoluteSize.Y - lscale) or UIListLayout.AbsoluteContentSize.Y >= (Parent.AbsoluteSize.Y - lscale) then
 						Section:SetAttribute('Height',nil);
 					else
@@ -8548,7 +9426,12 @@ function Compkiller.new(Config : Window)
 
 						local remainingHeight = UIListLayout.AbsoluteContentSize.Y + (Parent.AbsoluteSize.Y - (parentScale));
 
+						if Section:GetAttribute('Lasth') then
+							remainingHeight = math.max(remainingHeight , Section:GetAttribute('Lasth'));
+						end;
+
 						Section:SetAttribute('Height',remainingHeight);
+						Section:SetAttribute('Lasth',remainingHeight);
 					end;
 				else
 					Section:SetAttribute('Height',nil);
@@ -8612,9 +9495,25 @@ function Compkiller.new(Config : Window)
 				end;
 
 				refresh();
-
 				refreshScale();
 			end);
+
+			task.delay(2.5,function()
+				refresh();
+				refreshScale();
+			end);
+
+			Header.MouseEnter:Connect(function()
+				Compkiller:_Animation(SectionText,TweenInfo.new(0.2),{
+					TextTransparency = 0.25
+				})
+			end)	
+
+			Header.MouseLeave:Connect(function()
+				Compkiller:_Animation(SectionText,TweenInfo.new(0.2),{
+					TextTransparency = 0.500
+				})
+			end)
 
 			return Compkiller:_LoadElement(Section , true , TabOpenSignal)
 		end;
@@ -8690,6 +9589,8 @@ function Compkiller.new(Config : Window)
 		end;
 
 		function WindowArgs:Watermark()
+			local Signal = Compkiller.__SIGNAL(true);
+
 			local Watermark = Instance.new("Frame")
 			local UICorner = Instance.new("UICorner")
 			local Logo = Instance.new("Frame")
@@ -8704,6 +9605,8 @@ function Compkiller.new(Config : Window)
 			Watermark.AnchorPoint = Vector2.new(1, 0)
 			Watermark.BackgroundColor3 = Compkiller.Colors.BGDBColor
 
+			Compkiller:Drag(Watermark , Watermark, 0.1);
+
 			table.insert(Compkiller.Elements.BGDBColor,{
 				Element = Watermark,
 				Property = 'BackgroundColor3'
@@ -8715,18 +9618,6 @@ function Compkiller.new(Config : Window)
 			Watermark.Position = UDim2.new(1, -10, 0, 10)
 			Watermark.Size = UDim2.new(0, 45, 0, 23)
 			Watermark.ZIndex = 150
-
-			ImageLabel:GetPropertyChangedSignal('ClipsDescendants'):Connect(function()
-				if ImageLabel.ClipsDescendants then
-					Compkiller:_Animation(Watermark , TweenInfo.new(0.2),{
-						Position = UDim2.new(1, -60, 0, 10)
-					})
-				else
-					Compkiller:_Animation(Watermark , TweenInfo.new(0.2),{
-						Position = UDim2.new(1, -10, 0, 10)
-					})
-				end;
-			end)
 
 			UICorner.CornerRadius = UDim.new(0, 3)
 			UICorner.Parent = Watermark
@@ -8777,6 +9668,15 @@ function Compkiller.new(Config : Window)
 			CompLogo.SizeConstraint = Enum.SizeConstraint.RelativeYY
 			CompLogo.ZIndex = 159
 			CompLogo.Image = Config.Logo
+			
+			if Compkiller.CustomHighlightMode then
+				CompLogo.ImageColor3 = Compkiller.Colors.Highlight;
+
+				table.insert(Compkiller.Elements.Highlight , {
+					Element = CompLogo,
+					Property = 'ImageColor3'
+				});
+			end;
 
 			WaternarkList.Name = Compkiller:_RandomString()
 			WaternarkList.Parent = Watermark
@@ -8806,7 +9706,7 @@ function Compkiller.new(Config : Window)
 			BackFrame.Position = UDim2.new(1, 0, 0.5, 0)
 			BackFrame.Size = UDim2.new(1, 30, 1, 0)
 
-			Compkiller:_Blur(BackFrame,WindowOpen);
+			Compkiller:_Blur(BackFrame,Signal);
 
 			UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
 				Compkiller:_Animation(Watermark,TweenInfo.new(0.4),{
@@ -8870,6 +9770,19 @@ function Compkiller.new(Config : Window)
 				function Arg:Visible(v)
 					Icon.Visible = v;
 					TextLabel.Visible = v;
+
+					if Compkiller.PerformanceMode then
+						if v then
+							Compkiller:_SetNilP(Icon , WaternarkList);
+							Compkiller:_SetNilP(TextLabel , WaternarkList);
+						else
+							Compkiller:_SetNilP(Icon , nil);
+							Compkiller:_SetNilP(TextLabel , nil);
+						end;
+					else
+						Compkiller:_SetNilP(Icon , WaternarkList);
+						Compkiller:_SetNilP(TextLabel , WaternarkList);
+					end;
 				end;
 
 				return Arg;
@@ -8952,6 +9865,10 @@ function Compkiller.new(Config : Window)
 		end);
 	end;
 
+	function WindowArgs:SetMenuKey(new: string | Enum.KeyCode)
+		Config.Keybind = new;
+	end;
+
 	function WindowArgs:Update(config: WindowUpdate)
 		config = config or {};
 		config.Logo = config.Logo or Config.Logo;
@@ -8959,6 +9876,10 @@ function Compkiller.new(Config : Window)
 		config.ExpireDate = config.ExpireDate or "NEVER";
 		config.WindowName = config.WindowName or Config.Name;
 		config.UserProfile = config.UserProfile or WindowArgs.Profile or string.format("rbxthumb://type=AvatarHeadShot&id=%s&w=150&h=150",tostring(LocalPlayer.UserId));
+
+		if Compkiller.SecureMode and string.find(config.UserProfile, "rbxassetid://",1,true) then
+			config.UserProfile = Compkiller:_GetIcon("user");
+		end;
 
 		UserText.Text = config.Username;
 		CompLogo.Image = config.Logo;
@@ -9006,6 +9927,9 @@ function Compkiller.new(Config : Window)
 
 		Compkiller:Drag(MovementFrame,MainFrame,0.1)
 
+		SelectionFrame.Position = UDim2.new(1, 5, 0, 28)
+		SelectionFrame.Size = UDim2.new(0, 8, 0, 22)
+
 		table.insert(Compkiller.Elements.Highlight,{
 			Element = SelectionFrame,
 			Property = "BackgroundColor3"
@@ -9018,7 +9942,7 @@ function Compkiller.new(Config : Window)
 			SelectionFrame.BackgroundColor3 = Compkiller.Colors.Highlight;
 
 			if WindowArgs.SelectedTab and WindowArgs.IsOpen then
-				local vili = -(TabButtons.AbsolutePosition.Y - WindowArgs.SelectedTab.AbsolutePosition.Y) + 2;
+				local vili = -(TabButtons.AbsolutePosition.Y - WindowArgs.SelectedTab.AbsolutePosition.Y) + 4;
 				local distance = (SelectionFrame.Position.Y.Offset - vili);
 
 				if vili < 0 or vili > TabButtons.AbsoluteSize.Y then
@@ -9132,16 +10056,19 @@ function Compkiller:GetConfig(Type: string)
 				Flag = v.Flag,
 				Value = Suf,
 				Functions = v,
+				AutoKeybind = (v.AutoKeybind and v.AutoKeybind:GetSettings());
 			}
 		elseif Type == "MK" then
 			ConfigFlags[v.Flag] = {
 				Flag = v.Flag,
 				Value = Suf,
+				AutoKeybind = (v.AutoKeybind and v.AutoKeybind:GetSettings());
 			}
 		else
 			table.insert(ConfigFlags , {
 				Flag = v.Flag,
-				Value = Suf
+				Value = Suf,
+				AutoKeybind = (v.AutoKeybind and v.AutoKeybind:GetSettings());
 			})
 		end;
 	end;
@@ -9176,29 +10103,6 @@ function Compkiller:ConfigManager(ConfigManager: ConfigManager) : ConfigFunction
 
 	local notify = Compkiller.newNotify();
 
-	local AutoPath = Compkiller:_Path(Args.Directory , "__autoload.json");
-
-	local function _readAuto()
-		if isfile(AutoPath) then
-			local ok, decoded = pcall(function()
-				return HttpService:JSONDecode(readfile(AutoPath));
-			end);
-			if ok and type(decoded) == "table" then
-				return decoded;
-			end;
-		end;
-		return {};
-	end;
-
-	local function _writeAuto(tbl)
-		local ok, enc = pcall(function()
-			return HttpService:JSONEncode(tbl);
-		end);
-		if ok then
-			writefile(AutoPath , enc);
-		end;
-	end;
-
 	function Args:WriteConfig(Config: WriteConfig)
 		Config = Compkiller.__CONFIG(Config , {
 			Name = Compkiller:_RandomString(),
@@ -9230,45 +10134,27 @@ function Compkiller:ConfigManager(ConfigManager: ConfigManager) : ConfigFunction
 
 		local Flags = Compkiller:GetConfig("KV");
 
-		local function applyEntry(entry)
-			local Value = Flags[entry.Flag]
-			if not Value then return end
-			if entry.Value.Type == "NormalElement" then
-				Value.Functions:SetValue(entry.Value.Value)
-			elseif entry.Value.Type == "ColorPicker" then
-				local Color = Color3.new(entry.Value.Color3.R, entry.Value.Color3.G, entry.Value.Color3.B)
-				local Transparency = entry.Value.Transparency
-				Value.Functions:SetValue(Color, Transparency)
-			end
-		end
+		for i,v in next , decoded do
+			if v and v.Flag then
 
-		-- Pass 1: Apply theme first if present so custom colors can override it
-		for _, v in next, decoded do
-			if v and v.Flag == "SelectTheme" and v.Value and v.Value.Type == "NormalElement" then
-				applyEntry(v)
-			end
-		end
+				local Value = Flags[v.Flag];
 
-		-- Pass 2: Apply all color pickers (includes UI colors) to override theme defaults
-		-- Apply all color pickers except ToggleColor first
-		for _, v in next, decoded do
-			if v and v.Flag and v.Flag ~= "SelectTheme" and v.Value and v.Value.Type == "ColorPicker" and v.Flag ~= "ToggleColor" then
-				applyEntry(v)
-			end
-		end
-		-- Then apply ToggleColor last so it's not overridden by HighlightColor logic
-		for _, v in next, decoded do
-			if v and v.Flag == "ToggleColor" and v.Value and v.Value.Type == "ColorPicker" then
-				applyEntry(v)
-			end
-		end
+				if Value then
 
-		-- Pass 3: Apply remaining normal elements
-		for _, v in next, decoded do
-			if v and v.Flag and v.Flag ~= "SelectTheme" and v.Value and v.Value.Type == "NormalElement" then
-				applyEntry(v)
+					if v.Value.Type == "NormalElement" then
+						Value.Functions:SetValue(v.Value.Value);
+
+					elseif v.Value.Type == "ColorPicker" then
+
+						local Color = Color3.new(v.Value.Color3.R,v.Value.Color3.G,v.Value.Color3.B);
+
+						local Transparency = v.Value.Transparency;
+
+						Value.Functions:SetValue(Color , Transparency);
+					end;
+				end;
 			end
-		end
+		end;
 	end;
 
 	function Args:GetCurrentConfig()
@@ -9308,50 +10194,13 @@ function Compkiller:ConfigManager(ConfigManager: ConfigManager) : ConfigFunction
 			local Name = string.sub(v , #Args.Directory + 2);
 			local Info = Args:ReadInfo(Name);
 
-			if Info and type(Info) == "table" and Info.Type == "Information" then
-				table.insert(names , {
-					Name = Name,
-					Info = Info,
-				});
-			end;
+			table.insert(names , {
+				Name = Name,
+				Info = Info,
+			});
 		end;
 
 		return names;
-	end;
-
-	function Args:SetAutoLoad(ConfigName , enabled)
-		local map = _readAuto();
-		if enabled then
-			map[ConfigName] = true;
-		else
-			map[ConfigName] = nil;
-		end;
-		_writeAuto(map);
-	end;
-
-	function Args:SetSingleAutoLoad(ConfigName, enabled)
-		local map = {}
-		if enabled then
-			map[ConfigName] = true
-		end
-		_writeAuto(map)
-	end;
-
-	function Args:GetAutoLoad(ConfigName)
-		local map = _readAuto();
-		return map[ConfigName] and true or false;
-	end;
-
-	function Args:GetAutoLoadMap()
-		return _readAuto();
-	end;
-
-	function Args:LoadAuto()
-		for name, enabled in next , _readAuto() do
-			if enabled then
-				self:LoadConfig(name);
-			end;
-		end;
 	end;
 
 	function Args:DeleteConfig(ConfigName)
@@ -9368,23 +10217,14 @@ function Compkiller:ConfigManager(ConfigManager: ConfigManager) : ConfigFunction
 		if isfile(_path) then
 			delfile(_path);
 		end;
-		self:SetAutoLoad(ConfigName,false);
 	end;
 
 	function Args:GetConfigCount()
-		local count = 0;
-		for _,v in next , listfiles(Args.Directory) do
-			local Name = string.sub(v , #Args.Directory + 2);
-			local Info = Args:ReadInfo(Name);
-			if Info and type(Info) == "table" and Info.Type == "Information" then
-				count += 1;
-			end;
-		end;
-		return count;
+		return #listfiles(Args.Directory);
 	end;
 
 	function Args:LoadConfig(ConfigName: string)
-		local _path = Compkiller:_Path(Args.Directory, ConfigName);
+		local _path = Compkiller:_Path(Args.Directory,ConfigName);
 
 		if isfile(_path) then
 			local info = readfile(_path);
@@ -9401,70 +10241,40 @@ function Compkiller:ConfigManager(ConfigManager: ConfigManager) : ConfigFunction
 				})
 			end
 
-			-- пофикси: define safe locally to avoid global nil/unsafe call, fallback to warn always (see error in screenshot)
-			local safeShowNotification = function(title, msg)
-				if typeof(showNotification) == "function" then
-					local ok, err = pcall(function() showNotification(title, msg) end)
-					if not ok then
-						warn("[Config] Failed to call showNotification: " .. tostring(err))
-					end
-				else
-					warn("[Config] ".. tostring(title) .. " - " .. tostring(msg))
-				end
-			end
+			for i,v in next , decoded do
+				if v and v.Flag then
 
-			local function applyEntry(entry)
-				local Value = Flags[entry.Flag]
-				if not Value then return end
-				local success, err = pcall(function()
-					if entry.Value.Type == "NormalElement" then
-						Value.Functions:SetValue(entry.Value.Value)
-					elseif entry.Value.Type == "ColorPicker" then
-						local Color = Color3.new(entry.Value.Color3.R, entry.Value.Color3.G, entry.Value.Color3.B)
-						local Transparency = entry.Value.Transparency
-						Value.Functions:SetValue(Color, Transparency)
-					end
-				end)
-				if not success then
-					safeShowNotification("Config Load Error", "Failed to set value for '"..tostring(entry.Flag).."'! Error: "..tostring(err))
-				end
-			end
+					local Value = Flags[v.Flag];
 
-			-- Pass 1: Apply theme first if present so custom colors can override it
-			for _, v in next, decoded do
-				if v and v.Flag == "SelectTheme" and v.Value and v.Value.Type == "NormalElement" then
-					applyEntry(v)
-				end
-			end
+					if Value then
 
-			-- Pass 2: Apply all color pickers (includes UI colors) to override theme defaults
-			-- Apply all color pickers except ToggleColor first
-			for _, v in next, decoded do
-				if v and v.Flag and v.Flag ~= "SelectTheme" and v.Value and v.Value.Type == "ColorPicker" and v.Flag ~= "ToggleColor" then
-					applyEntry(v)
-				end
-			end
-			-- Then apply ToggleColor last so it's not overridden by HighlightColor logic
-			for _, v in next, decoded do
-				if v and v.Flag == "ToggleColor" and v.Value and v.Value.Type == "ColorPicker" then
-					applyEntry(v)
-				end
-			end
+						if v.Value.Type == "NormalElement" then
+							Value.Functions:SetValue(v.Value.Value);
 
-			-- Pass 3: Apply remaining normal elements
-			for _, v in next, decoded do
-				if v and v.Flag and v.Flag ~= "SelectTheme" and v.Value and v.Value.Type == "NormalElement" then
-					applyEntry(v)
+						elseif v.Value.Type == "ColorPicker" then
+
+							local Color = Color3.new(v.Value.Color3.R,v.Value.Color3.G,v.Value.Color3.B);
+
+							local Transparency = v.Value.Transparency;
+
+							Value.Functions:SetValue(Color , Transparency);
+						end;
+
+						if Value.Functions.AutoKeybind then
+							if v.AutoKeybind then
+								Value.Functions.AutoKeybind:LoadSettings(v.AutoKeybind)
+							end;
+						end;
+					end;
 				end
-			end
+			end;
 		end;
 	end;
 
 	return Args;
 end;
 
-
-function Compkiller:Loader(IconId, Duration)
+function Compkiller:Loader(IconId,Duration)
 	local CompKiller = Instance.new("ScreenGui")
 
 	CompKiller.Name = Compkiller:_RandomString()
@@ -9497,7 +10307,7 @@ function Compkiller:Loader(IconId, Duration)
 	Icon.Position = UDim2.new(0.5, 0, 0.5, 0)
 	Icon.Size = UDim2.new(0, 750, 0, 750)
 	Icon.ZIndex = 100
-	Icon.Image = IconId or "rbxassetid://120245531583106"
+	Icon.Image = IconId or Compkiller.Logo;
 	Icon.ImageTransparency = 1
 
 	Vignette.Name = Compkiller:_RandomString()
@@ -9506,97 +10316,67 @@ function Compkiller:Loader(IconId, Duration)
 	Vignette.BorderColor3 = Color3.fromRGB(27, 42, 53)
 	Vignette.BorderSizePixel = 0
 	Vignette.Size = UDim2.new(1, 0, 1, 0)
-	Vignette.Image = "rbxassetid://18720640102"
+	Vignette.Image = Compkiller:CacheImage("rbxassetid://18720640102")
 	Vignette.ImageColor3 = Compkiller.Colors.Highlight
 	Vignette.ImageTransparency = 1
 	Vignette.AnchorPoint = Vector2.new(0.5,0.5)
 	Vignette.Position = UDim2.fromScale(0.5,0.5)
 
-	local Event = Instance.new("BindableEvent")
-
-	-- INSTANT MODE
-	if Compkiller.InstantLoading then
-		-- Моментально показываем лёгкий экран загрузки и сразу даём скрипту работать
-		Loader.BackgroundTransparency = 0.5
-		Icon.ImageTransparency = 0
-		Icon.Size = UDim2.new(0, 200, 0, 200)
-		Vignette.ImageTransparency = 0.2
-
-		task.spawn(function()
-			-- Duration можно делать очень маленьким, например 0.1
-			task.wait(Duration or 0.1)
-
-			-- Быстро скрываем и удаляем
-			Loader.BackgroundTransparency = 1
-			Icon.ImageTransparency = 1
-			Vignette.ImageTransparency = 1
-
-			CompKiller:Destroy()
-			Event:Fire()
-		end)
-
-		return {
-			yield = function()
-				return Event.Event:Wait()
-			end
-		}
-	end
-
-	-- СТАРЫЙ КРАСИВЫЙ АНИМИРОВАННЫЙ РЕЖИМ (если InstantLoading = false)
 	Compkiller:_Animation(Loader,TweenInfo.new(0.55,Enum.EasingStyle.Quint),{
 		BackgroundTransparency = 0.5
-	})
+	});
+
+	local Event = Instance.new('BindableEvent');
 
 	task.delay(0.5,function()
 		Compkiller:_Animation(Icon,TweenInfo.new(0.75,Enum.EasingStyle.Quint),{
 			ImageTransparency = 0.01,
 			Size = UDim2.new(0, 200, 0, 200)
-		})
+		});
 
 		task.delay(0.25,function()
 			Compkiller:_Animation(Vignette,TweenInfo.new(5),{
 				ImageTransparency = 0.2
-			})
+			});
 
 			task.wait(Duration or 4.5)
 
 			Compkiller:_Animation(Vignette,TweenInfo.new(3,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut),{
 				Size = UDim2.new(2, 0, 2, 0)
-			})
+			});
 
 			Compkiller:_Animation(Icon,TweenInfo.new(0.75,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut),{
 				ImageTransparency = 1,
-			})
+			});
 
 			Compkiller:_Animation(Loader,TweenInfo.new(1.5,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut),{
 				BackgroundTransparency = 1
-			})
+			});
 
 			task.delay(0.1,function()
 				Compkiller:_Animation(Vignette,TweenInfo.new(1,Enum.EasingStyle.Quint,Enum.EasingDirection.InOut),{
 					ImageTransparency = 1
-				})
+				});
 
 				task.wait(0.2)
 
 				task.delay(3,function()
-					CompKiller:Destroy()
+					CompKiller:Destroy();
 				end)
 			end)
 
 			task.delay(0.6,function()
-				Event:Fire()
+				Event:Fire();
 			end)
 		end)
-	end)
+	end);
 
 	return {
 		yield = function()
-			return Event.Event:Wait()
-		end
-	}
-end
-
+			return Event.Event:Wait();
+		end	
+	};
+end;
 
 function Compkiller.newNotify()
 	if Compkiller.NOTIFY_CACHE then
@@ -9608,7 +10388,7 @@ function Compkiller.newNotify()
 	local UIListLayout = Instance.new("UIListLayout")
 
 	Notification.Name = Compkiller:_RandomString()
-	Notification.Parent = CoreGui
+	Notification.Parent = CoreGui;
 	Notification.ResetOnSpawn = false
 	Notification.ZIndexBehavior = Enum.ZIndexBehavior.Global
 
@@ -9654,7 +10434,7 @@ function Compkiller.newNotify()
 			BlockFrame.Name = Compkiller:_RandomString()
 			BlockFrame.Parent = NotifyContainer
 			BlockFrame.AnchorPoint = Vector2.new(1, 0)
-			BlockFrame.BackgroundColor3 = Color3.fromRGB(22, 24, 29)
+			BlockFrame.BackgroundColor3 = Compkiller.Colors.BGDBColor
 			BlockFrame.BackgroundTransparency = 1.000
 			BlockFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			BlockFrame.BorderSizePixel = 0
@@ -9662,9 +10442,10 @@ function Compkiller.newNotify()
 			BlockFrame.Size = UDim2.new(0, 200, 0, 0)
 			BlockFrame.LayoutOrder = LayoutREF;
 
+
 			NotifyFrame.Name = Compkiller:_RandomString()
 			NotifyFrame.Parent = BlockFrame
-			NotifyFrame.BackgroundColor3 = Color3.fromRGB(22, 24, 29)
+			NotifyFrame.BackgroundColor3 = Compkiller.Colors.BGDBColor
 			NotifyFrame.BackgroundTransparency = 0.100
 			NotifyFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			NotifyFrame.BorderSizePixel = 0
@@ -9672,6 +10453,7 @@ function Compkiller.newNotify()
 			NotifyFrame.Size = UDim2.new(1, 0, 1, -5)
 			NotifyFrame.ZIndex = 2
 			NotifyFrame.Position = UDim2.new(1,200,0,0)
+
 
 			UICorner.CornerRadius = UDim.new(0, 4)
 			UICorner.Parent = NotifyFrame
@@ -9685,8 +10467,17 @@ function Compkiller.newNotify()
 			CompLogo.Position = UDim2.new(0, 6, 0, 6)
 			CompLogo.Size = UDim2.new(0, 25, 0, 25)
 			CompLogo.ZIndex = 4
-			CompLogo.Image = Compkiller:_GetIcon(Notify.Icon);
 
+			if string.find(Notify.Icon,'cache-ck-',1,true) then	
+				CompLogo.Image = Notify.Icon;
+			else
+				CompLogo.Image = Compkiller:_GetIcon(Notify.Icon);
+			end;
+
+			if Compkiller.CustomHighlightMode then
+				CompLogo.ImageColor3 = Compkiller.Colors.Highlight;
+			end;
+			
 			Header.Name = Compkiller:_RandomString()
 			Header.Parent = NotifyFrame
 			Header.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -9840,5 +10631,7 @@ function Compkiller.newNotify()
 
 	return Compkiller.NOTIFY_CACHE;
 end;
+
+Compkiller.NilFolder.Name = "Nil-Instances";
 
 return Compkiller;
