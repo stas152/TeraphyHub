@@ -1,4 +1,3 @@
-local CompKillerLib = [[
 export type cloneref = (target: Instance) -> Instance;
 
 export type Window = {
